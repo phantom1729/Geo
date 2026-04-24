@@ -3,1247 +3,236 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Safety Geofence Tracker - PWA</title>
+    <title>Safety Geofence Tracker</title>
     
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIlNhZmV0eSBHZW9mZW5jZSBUcmFja2VyIiwKICAic2hvcnRfbmFtZSI6ICJTYWZlVHJhY2tlciIsCiAgInN0YXJ0X3VybCI6ICIvIiwKICAiZGlzcGxheSI6ICJzdGFuZGFsb25lIiwKICAiYmFja2dyb3VuZF9jb2xvciI6ICIjZmYzZGRiIiwKICAidGhlbWVfY29sb3IiOiAiIzAwNDFmZiIsCiAgImljb25zIjogWwogICAgewogICAgICAic3JjIjogImRhdGE6aW1hZ2Uvc3ZnK2Jhc2U2NCxQSE4yWkdHZ1lXMWxJaUF2Y2daR2R5YVhSMGNITTZMeTlqYjJ4cFoyMWlMbTl2YTJsbGNpNXRkR1Z5YkdGemN5NXBiMjluYkdVdWJHOW5LQzF1YVc5dWN5NXBiMjluYkdVdWJHOW5LQzF1YVc5dWN5NXBiMjluYkdVdWJHOW5LQzF1YVc5dU1IQWdiR1ZqZEdGemN5NXBiMjluYkdVdWJHOW5LQzF1YVc5dSIsCiAgICAgICJzaXplcyI6ICIxOTJ4MTkyIiwKICAgICAgInR5cGUiOiAiaW1hZ2Uvc3ZnK3htbCIsCiAgICAgICJwdXJwb3NlIjogIm1hc2sgYWJsZSIKICAgIH0KICBdCn0=">
-    
-    <!-- Fallback to Leaflet (OpenStreetMap) - Google Maps optional -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
-            --primary: #0041ff;
-            --primary-dark: #0033cc;
-            --success: #28a745;
-            --danger: #dc3545;
-            --warning: #ffc107;
-            --dark: #1a1a1a;
-            --light: #f8f9fa;
-            --white: #ffffff;
-            --shadow: 0 4px 20px rgba(0,0,0,0.1);
+            --primary: #0041ff; --primary-dark: #0033cc;
+            --success: #28a745; --danger: #dc3545;
+            --warning: #ffc107; --dark: #1a1a1a;
+            --white: #ffffff; --shadow: 0 4px 20px rgba(0,0,0,0.1);
         }
-
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            overflow-x: hidden;
         }
-
-        .app-container {
-            max-width: 100%;
-            margin: 0 auto;
-            min-height: 100vh;
-            position: relative;
-        }
-
-        /* Header */
+        .app-container { max-width: 600px; margin: 0 auto; min-height: 100vh; position: relative; }
         .header {
-            background: rgba(255,255,255,0.95);
-            backdrop-filter: blur(20px);
-            padding: 1rem;
-            box-shadow: var(--shadow);
-            position: sticky;
-            top: 0;
-            z-index: 1000;
+            background: rgba(255,255,255,0.95); padding: 1rem;
+            box-shadow: var(--shadow); position: sticky; top: 0; z-index: 1000;
         }
-
-        .header h1 {
-            color: var(--primary);
-            font-size: 1.5rem;
-            font-weight: 700;
-            text-align: center;
-            margin-bottom: 0.5rem;
-        }
-
-        .status-bar {
-            display: flex;
-            justify-content: space-around;
-            font-size: 0.85rem;
-            color: var(--dark);
-        }
-
-        .status-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0.25rem;
-        }
-
-        .status-battery {
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-        }
-
-        .battery-fill {
-            width: 30px;
-            height: 12px;
-            background: #ddd;
-            border-radius: 2px;
-            overflow: hidden;
-            position: relative;
-        }
-
-        .battery-fill::after {
-            content: '';
-            position: absolute;
-            right: -3px;
-            top: 2px;
-            width: 2px;
-            height: 8px;
-            background: #333;
-        }
-
-        .battery-level {
-            height: 100%;
-            background: linear-gradient(90deg, var(--success), var(--warning), var(--danger));
-            transition: width 0.3s ease;
-        }
-
-        /* Main Content */
-        .main-content {
-            padding: 1rem;
-            padding-bottom: 4rem;
-        }
-
-        /* SOS Button - Always Visible */
-        .sos-container {
-            position: fixed;
-            bottom: 1rem;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 2000;
-        }
-
+        .header h1 { color: var(--primary); font-size: 1.5rem; text-align: center; margin-bottom: 0.5rem; }
+        .status-bar { display: flex; justify-content: space-around; font-size: 0.85rem; }
+        .status-item { display: flex; flex-direction: column; align-items: center; }
+        .main-content { padding: 1rem; padding-bottom: 6rem; }
+        .map-container { height: 350px; border-radius: 16px; overflow: hidden; margin-bottom: 1rem; box-shadow: var(--shadow); background: #e0e7ff; }
+        #map { height: 100%; width: 100%; }
+        .card { background: rgba(255,255,255,0.95); border-radius: 16px; padding: 1.2rem; margin-bottom: 1rem; box-shadow: var(--shadow); }
+        .nav-tabs { display: flex; background: white; border-radius: 12px; overflow: hidden; margin-bottom: 1rem; }
+        .nav-tab { flex: 1; padding: 0.8rem; border: none; font-weight: 600; cursor: pointer; background: #eee; }
+        .nav-tab.active { background: var(--primary); color: white; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
         .sos-button {
-            background: var(--danger);
-            color: white;
-            border: none;
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            font-size: 1.2rem;
-            font-weight: 700;
-            box-shadow: 0 8px 30px rgba(220,53,69,0.4);
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-decoration: none;
-            animation: pulse 2s infinite;
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: var(--danger); color: white; border: none; width: 70px; height: 70px;
+            border-radius: 50%; font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.3); z-index: 2000;
         }
-
-        @keyframes pulse {
-            0% { box-shadow: 0 8px 30px rgba(220,53,69,0.4); }
-            50% { box-shadow: 0 12px 40px rgba(220,53,69,0.6); }
-            100% { box-shadow: 0 8px 30px rgba(220,53,69,0.4); }
-        }
-
-        .sos-button:active {
-            transform: scale(0.95);
-            box-shadow: 0 4px 15px rgba(220,53,69,0.3);
-        }
-
-        /* Map Container */
-        .map-container {
-            height: 400px;
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: var(--shadow);
-            margin-bottom: 1rem;
-            background: #e0e7ff;
-            position: relative;
-        }
-
-        #map {
-            height: 100%;
-            width: 100%;
-            border-radius: 16px;
-        }
-
-        /* Cards */
-        .card {
-            background: rgba(255,255,255,0.95);
-            backdrop-filter: blur(20px);
-            border-radius: 16px;
-            padding: 1.5rem;
-            margin-bottom: 1rem;
-            box-shadow: var(--shadow);
-            border: 1px solid rgba(255,255,255,0.2);
-        }
-
-        .card h3 {
-            color: var(--primary);
-            margin-bottom: 1rem;
-            font-size: 1.2rem;
-        }
-
-        /* Geofence List */
-        .geofence-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 1rem;
-            margin-top: 1rem;
-        }
-
-        .geofence-item {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            color: white;
-            padding: 1rem;
-            border-radius: 12px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .geofence-item:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0,65,255,0.3);
-        }
-
-        .geofence-item.active {
-            box-shadow: 0 0 20px rgba(0,65,255,0.6);
-            animation: glow 1s infinite alternate;
-        }
-
-        @keyframes glow {
-            from { box-shadow: 0 0 20px rgba(0,65,255,0.6); }
-            to { box-shadow: 0 0 30px rgba(0,65,255,0.8); }
-        }
-
-        /* Settings Form */
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
-            color: var(--dark);
-        }
-
-        .form-group input,
-        .form-group select {
-            width: 100%;
-            padding: 0.75rem;
-            border: 2px solid #e9ecef;
-            border-radius: 12px;
-            font-size: 1rem;
-            transition: border-color 0.3s ease;
-        }
-
-        .form-group input:focus,
-        .form-group select:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(0,65,255,0.1);
-        }
-
-        .btn {
-            background: var(--primary);
-            color: white;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 12px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            width: 100%;
-            margin-bottom: 0.5rem;
-        }
-
-        .btn:hover {
-            background: var(--primary-dark);
-            transform: translateY(-1px);
-        }
-
-        .btn-success {
-            background: var(--success);
-        }
-
-        .btn-success:hover {
-            background: #218838;
-        }
-
-        .btn-danger {
-            background: var(--danger);
-        }
-
-        .btn-danger:hover {
-            background: #c82333;
-        }
-
-        /* Navigation */
-        .nav-tabs {
-            display: flex;
-            background: rgba(255,255,255,0.9);
-            border-radius: 12px;
-            overflow: hidden;
-            margin-bottom: 1rem;
-            box-shadow: var(--shadow);
-        }
-
-        .nav-tab {
-            flex: 1;
-            padding: 1rem;
-            background: transparent;
-            border: none;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .nav-tab.active {
-            background: var(--primary);
-            color: white;
-        }
-
-        /* Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.8);
-            z-index: 3000;
-            backdrop-filter: blur(10px);
-        }
-
-        .modal-content {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: white;
-            padding: 2rem;
-            border-radius: 20px;
-            max-width: 90%;
-            max-height: 90%;
-            overflow-y: auto;
-        }
-
-        .close-modal {
-            position: absolute;
-            top: 1rem;
-            right: 1.5rem;
-            font-size: 2rem;
-            cursor: pointer;
-            color: #999;
-        }
-
-        /* Loading */
-        .loading {
-            display: none;
-            text-align: center;
-            padding: 2rem;
-        }
-
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid var(--primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 1rem;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .status-bar {
-                font-size: 0.75rem;
-            }
-            
-            .map-container {
-                height: 300px;
-            }
-            
-            .header h1 {
-                font-size: 1.3rem;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .sos-container {
-                bottom: 0.5rem;
-            }
-            
-            .sos-button {
-                width: 70px;
-                height: 70px;
-                font-size: 1rem;
-            }
-        }
-
-        /* Safe Area for iPhone */
-        @supports(padding: max(0px)) {
-            body {
-                padding-bottom: env(safe-area-inset-bottom);
-            }
-        }
+        .btn { background: var(--primary); color: white; border: none; padding: 0.8rem; border-radius: 10px; width: 100%; cursor: pointer; font-weight: 600; margin-top: 5px; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 3000; }
+        .modal-content { background: white; padding: 2rem; border-radius: 15px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 85%; }
+        .form-group { margin-bottom: 1rem; }
+        input, select { width: 100%; padding: 0.6rem; border-radius: 8px; border: 1px solid #ccc; margin-top: 5px; }
     </style>
 </head>
 <body>
     <div class="app-container">
-        <!-- Header -->
         <header class="header">
             <h1>🛡️ Safety Tracker</h1>
             <div class="status-bar">
-                <div class="status-item">
-                    <span id="status-tracking">⏹️ Stopped</span>
-                    <small>Location</small>
-                </div>
-                <div class="status-item">
-                    <div class="status-battery">
-                        <span id="battery-level">--%</span>
-                        <div class="battery-fill">
-                            <div class="battery-level" style="width: 0%"></div>
-                        </div>
-                    </div>
-                    <small>Battery</small>
-                </div>
-                <div class="status-item">
-                    <span id="status-mode">🏠 Home</span>
-                    <small>Mode</small>
-                </div>
-                <div class="status-item">
-                    <span id="timer-display">--:--</span>
-                    <small>Timer</small>
-                </div>
+                <div class="status-item"><span id="status-tracking">⏹️ Stopped</span><small>GPS</small></div>
+                <div class="status-item"><span id="status-mode">🏠 Home</span><small>Mode</small></div>
+                <div class="status-item"><span id="timer-display">--:--</span><small>Timer</small></div>
             </div>
         </header>
 
-        <!-- Main Content -->
         <main class="main-content">
-            <!-- Navigation Tabs -->
             <div class="nav-tabs">
                 <button class="nav-tab active" data-tab="dashboard">Dashboard</button>
                 <button class="nav-tab" data-tab="geofences">Geofences</button>
                 <button class="nav-tab" data-tab="settings">Settings</button>
             </div>
 
-            <!-- Dashboard Tab -->
             <div id="dashboard" class="tab-content active">
-                <div class="map-container">
-                    <div id="map"></div>
-                </div>
+                <div class="map-container"><div id="map"></div></div>
                 <div class="card">
                     <h3>📍 Current Status</h3>
                     <div id="current-status">
-                        <p>Tap "Start Tracking" to begin monitoring</p>
+                        <button class="btn" onclick="tracker.startTracking()">Start Tracking</button>
                     </div>
                 </div>
             </div>
 
-            <!-- Geofences Tab -->
             <div id="geofences" class="tab-content">
                 <div class="card">
-                    <h3>➕ Add New Geofence</h3>
-                    <div class="form-group">
-                        <label>Name</label>
-                        <input type="text" id="geofence-name" placeholder="Home, School, etc.">
-                    </div>
-                    <div class="form-group">
-                        <label>Tap on map to set location</label>
-                        <p id="geofence-coords">No location selected</p>
-                    </div>
-                    <div class="form-group">
-                        <label>Radius (meters)</label>
-                        <input type="number" id="geofence-radius" value="20" min="5" max="500">
-                    </div>
-                    <button class="btn" onclick="saveGeofence()">Save Geofence</button>
+                    <h3>➕ Add Geofence</h3>
+                    <div class="form-group"><input type="text" id="geofence-name" placeholder="Name (e.g. Home)"></div>
+                    <div class="form-group"><label>Radius (meters)</label><input type="number" id="geofence-radius" value="50"></div>
+                    <p id="geofence-coords" style="font-size:0.8rem; color:#666">Tap on map to set point</p>
+                    <button class="btn" onclick="tracker.saveGeofence()">Save Location</button>
                 </div>
-                <div class="card">
-                    <h3>📍 Saved Locations</h3>
-                    <div id="geofence-list" class="geofence-list"></div>
-                </div>
+                <div id="geofence-list" class="card"></div>
             </div>
 
-            <!-- Settings Tab -->
             <div id="settings" class="tab-content">
                 <div class="card">
-                    <h3>⚙️ Telegram Settings</h3>
-                    <div class="form-group">
-                        <label>Bot Token</label>
-                        <input type="password" id="telegram-token" placeholder="123456:ABC-DEF...">
-                    </div>
-                    <div class="form-group">
-                        <label>Chat ID</label>
-                        <input type="text" id="telegram-chatid" placeholder="@username or 123456789">
-                    </div>
-                    <button class="btn" onclick="testTelegram()">Test Telegram</button>
-                </div>
-                <div class="card">
-                    <h3>⏱️ Timer Settings</h3>
-                    <div class="form-group">
-                        <label>Travel Timer (minutes)</label>
-                        <select id="travel-timer">
-                            <option value="5">5 minutes</option>
-                            <option value="10" selected>10 minutes</option>
-                            <option value="15">15 minutes</option>
-                            <option value="20">20 minutes</option>
-                            <option value="30">30 minutes</option>
-                        </select>
-                    </div>
-                    <button class="btn btn-success" onclick="saveSettings()">Save Settings</button>
+                    <h3>⚙️ Telegram Alerts</h3>
+                    <input type="password" id="telegram-token" placeholder="Bot Token">
+                    <input type="text" id="telegram-chatid" placeholder="Chat ID">
+                    <button class="btn" onclick="tracker.saveSettings()">Save Settings</button>
                 </div>
             </div>
         </main>
 
-        <!-- SOS Button -->
-        <div class="sos-container">
-            <button class="sos-button" onclick="triggerSOS()" title="Emergency SOS">SOS</button>
-        </div>
+        <button class="sos-button" onclick="triggerSOS()">SOS</button>
 
-        <!-- Loading Overlay -->
-        <div id="loading" class="loading">
-            <div class="spinner"></div>
-            <p id="loading-text">Initializing...</p>
-        </div>
-
-        <!-- Confirmation Modal -->
         <div id="confirm-modal" class="modal">
             <div class="modal-content">
-                <span class="close-modal" onclick="closeModal()">&times;</span>
-                <h2 id="modal-title">Confirm Action</h2>
+                <h2 id="modal-title">Confirm</h2>
                 <p id="modal-message"></p>
-                <div style="                <div style="display: flex; gap: 1rem; margin-top: 2rem;">
-                    <button class="btn btn-danger" id="modal-confirm" onclick="confirmAction()">Confirm</button>
-                    <button class="btn" onclick="closeModal()">Cancel</button>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button class="btn" style="background:var(--danger)" onclick="confirmAction()">Confirm</button>
+                    <button class="btn" style="background:#888" onclick="closeModal()">Cancel</button>
                 </div>
             </div>
         </div>
-
-        <!-- Status Messages -->
-        <div id="status-message" style="position: fixed; top: 100px; left: 50%; transform: translateX(-50%); padding: 1rem; background: rgba(0,0,0,0.8); color: white; border-radius: 12px; display: none; z-index: 2500;"></div>
     </div>
 
-    <!-- Leaflet.js (OpenStreetMap) -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
     <script>
-        // ========================================
-        // PART 2: JAVASCRIPT - FULL FUNCTIONALITY
-        // ========================================
-
-        class SafetyGeofenceTracker {
+        class SafetyTracker {
             constructor() {
-                this.map = null;
-                this.userMarker = null;
-                this.geofenceMarkers = [];
-                this.geofenceCircles = [];
-                this.watchId = null;
-                this.isTracking = false;
-                this.currentPosition = null;
-                this.geofences = [];
-                this.settings = {
-                    telegramToken: '',
-                    telegramChatId: '',
-                    travelTimer: 10 * 60 * 1000 // 10 minutes
-                };
-                this.timerInterval = null;
-                this.sosInterval = null;
-                this.isSOSActive = false;
-                this.shakeThreshold = 25;
-                this.lastShakeTime = 0;
-
+                this.map = null; this.userMarker = null; this.watchId = null;
+                this.isTracking = false; this.currentPosition = null;
+                this.selectedLatLng = null; this.geofences = [];
+                this.settings = { telegramToken: '', telegramChatId: '' };
                 this.init();
             }
 
-            // 1. Initialize App
-            async init() {
-                this.showLoading('Initializing app...');
-                
-                // Load data
+            init() {
                 this.loadData();
-                
-                // Init map
-                await this.initMap();
-                
-                // Request permissions
-                this.requestPermissions();
-                
-                // Init battery monitoring
-                this.initBatteryMonitor();
-                
-                // Init shake detection
-                this.initShakeDetection();
-                
-                // Update UI
-                this.updateUI();
-                
-                this.hideLoading();
-            }
-
-            // 2. Map Initialization (Leaflet/OpenStreetMap)
-            async initMap() {
-                // Default to user's location or Delhi, India
-                const defaultLat = 28.6139;
-                const defaultLng = 77.2090;
-
-                this.map = L.map('map', {
-                    zoomControl: true,
-                    zoom: 15,
-                    minZoom: 10,
-                    maxZoom: 20
-                }).setView([defaultLat, defaultLng], 15);
-
-                // OpenStreetMap tiles
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '© OpenStreetMap contributors'
-                }).addTo(this.map);
-
-                // Click to add geofence
+                this.map = L.map('map').setView([28.6139, 77.2090], 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.map);
                 this.map.on('click', (e) => {
-                    if (document.querySelector('.nav-tab.active').dataset.tab === 'geofences') {
-                        this.setGeofenceLocation(e.latlng);
-                    }
+                    this.selectedLatLng = e.latlng;
+                    document.getElementById('geofence-coords').innerText = `Set: ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
                 });
-
-                // Load existing geofences
-                this.loadGeofencesOnMap();
-
-                // Try to get current location
-                this.getCurrentLocation();
+                this.renderGeofenceList();
             }
 
-            // 3. Permissions
-            requestPermissions() {
-                // Location permission
-                if (navigator.permissions) {
-                    navigator.permissions.query({name: 'geolocation'}).then(permission => {
-                        if (permission.state === 'denied') {
-                            this.showStatus('Location permission denied. Please enable in settings.', 'warning');
-                        }
-                    });
-                }
-
-                // Notifications
-                if ('Notification' in window && Notification.permission === 'default') {
-                    Notification.requestPermission();
-                }
-            }
-
-            // 4. Battery Monitoring
-            initBatteryMonitor() {
-                if ('getBattery' in navigator) {
-                    navigator.getBattery().then(battery => {
-                        this.updateBattery(battery.level * 100);
-                        battery.addEventListener('levelchange', () => {
-                            this.updateBattery(battery.level * 100);
-                        });
-                    });
-                }
-            }
-
-            updateBattery(level) {
-                document.getElementById('battery-level').textContent = Math.round(level) + '%';
-                const fill = document.querySelector('.battery-level');
-                fill.style.width = level + '%';
-            }
-
-            // 5. Shake Detection (Emergency Trigger)
-            initShakeDetection() {
-                if (window.DeviceMotionEvent) {
-                    window.addEventListener('devicemotion', (e) => {
-                        const acceleration = e.accelerationIncludingGravity;
-                        if (!acceleration) return;
-
-                        const { x, y, z } = acceleration;
-                        const speed = Math.sqrt(x*x + y*y + z*z);
-                        const now = Date.now();
-
-                        if (speed > this.shakeThreshold && now - this.lastShakeTime > 1000) {
-                            this.lastShakeTime = now;
-                            this.showConfirm('Shake detected!', 'Trigger SOS?', () => {
-                                this.triggerSOS('Shake detection');
-                            });
-                        }
-                    });
-                }
-            }
-
-            // 6. Location Tracking
             startTracking() {
                 if (this.watchId) return;
-
                 this.isTracking = true;
-                document.getElementById('status-tracking').textContent = '🔄 Tracking';
-
+                document.getElementById('status-tracking').innerText = "🔄 Live";
                 this.watchId = navigator.geolocation.watchPosition(
-                    (position) => this.onLocationUpdate(position),
-                    (error) => this.onLocationError(error),
-                    {
-                        enableHighAccuracy: true,
-                        timeout: 5000,
-                        maximumAge: 10000
-                    }
-                );
-
-                this.showStatus('Tracking started', 'success');
-                this.updateUI();
-            }
-
-            stopTracking() {
-                if (this.watchId) {
-                    navigator.geolocation.clearWatch(this.watchId);
-                    this.watchId = null;
-                }
-                this.isTracking = false;
-                document.getElementById('status-tracking').textContent = '⏹️ Stopped';
-                this.showStatus('Tracking stopped', 'info');
-                this.updateUI();
-            }
-
-            onLocationUpdate(position) {
-                this.currentPosition = {
-                    lat: position.coords.latitude,
-                    lng: position.coords.longitude,
-                    accuracy: position.coords.accuracy
-                };
-
-                // Update user marker
-                if (this.userMarker) {
-                    this.userMarker.setLatLng([this.currentPosition.lat, this.currentPosition.lng]);
-                } else {
-                    this.userMarker = L.marker([this.currentPosition.lat, this.currentPosition.lng], {
-                        icon: L.divIcon({
-                            className: 'user-location',
-                            html: '👤',
-                            iconSize: [30, 30],
-                            iconAnchor: [15, 15]
-                        })
-                    }).addTo(this.map);
-                }
-
-                // Center map on user (with offset)
-                this.map.panTo([this.currentPosition.lat, this.currentPosition.lng], { animate: true });
-
-                // Check geofences
-                this.checkGeofences();
-
-                this.updateUI();
-            }
-
-            onLocationError(error) {
-                let message = 'Location error: ';
-                switch(error.code) {
-                    case error.PERMISSION_DENIED:
-                        message += 'Permission denied';
-                        break;
-                    case error.POSITION_UNAVAILABLE:
-                        message += 'Position unavailable';
-                        break;
-                    case error.TIMEOUT:
-                        message += 'Timeout';
-                        break;
-                }
-                this.showStatus(message, 'error');
-            }
-
-            getCurrentLocation() {
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        this.currentPosition = {
-                            lat: position.coords.latitude,
-                            lng: position.coords.longitude
-                        };
-                        this.map.setView([this.currentPosition.lat, this.currentPosition.lng], 15);
-                    },
-                    () => {
-                        // Fallback to default location
-                        this.map.setView([28.6139, 77.2090], 15);
-                    },
+                    (pos) => this.updateLocation(pos),
+                    (err) => console.error(err),
                     { enableHighAccuracy: true }
                 );
+                this.updateUI();
             }
 
-            // 7. Geofencing System
-            setGeofenceLocation(latlng) {
-                document.getElementById('geofence-coords').textContent = 
-                    `Lat: ${latlng.lat.toFixed(6)}, Lng: ${latlng.lng.toFixed(6)}`;
-            }
-
-            async saveGeofence() {
-                const name = document.getElementById('geofence-name').value.trim();
-                const radius = parseInt(document.getElementById('geofence-radius').value);
-                
-                if (!name || !this.currentPosition) {
-                    this.showStatus('Please enter name and select location', 'warning');
-                    return;
+            updateLocation(pos) {
+                const { latitude, longitude } = pos.coords;
+                this.currentPosition = { lat: latitude, lng: longitude };
+                if (!this.userMarker) {
+                    this.userMarker = L.circleMarker([latitude, longitude], { color: 'blue', radius: 8 }).addTo(this.map);
+                } else {
+                    this.userMarker.setLatLng([latitude, longitude]);
                 }
-
-                const geofence = {
-                    id: Date.now().toString(),
-                    name,
-                    lat: this.currentPosition.lat,
-                    lng: this.currentPosition.lng,
-                    radius: radius || 20,
-                    created: new Date().toISOString()
-                };
-
-                this.geofences.push(geofence);
-                this.saveData();
-                this.loadGeofencesOnMap();
-                this.renderGeofenceList();
-
-                document.getElementById('geofence-name').value = '';
-                document.getElementById('geofence-coords').textContent = 'No location selected';
-                this.showStatus(`Geofence "${name}" saved`, 'success');
+                this.map.panTo([latitude, longitude]);
+                this.checkGeofences();
             }
 
-            loadGeofencesOnMap() {
-                // Clear existing
-                this.geofenceMarkers.forEach(marker => this.map.removeLayer(marker));
-                this.geofenceCircles.forEach(circle => this.map.removeLayer(circle));
-                this.geofenceMarkers = [];
-                this.geofenceCircles = [];
-
-                this.geofences.forEach(geofence => {
-                    // Marker
-                    const marker = L.marker([geofence.lat, geofence.lng], {
-                        title: geofence.name
-                    }).addTo(this.map);
-                    marker.bindPopup(`<b>${geofence.name}</b><br>Radius: ${geofence.radius}m`);
-                    this.geofenceMarkers.push(marker);
-
-                    // Circle
-                    const circle = L.circle([geofence.lat, geofence.lng], {
-                        radius: geofence.radius,
-                        color: '#0041ff',
-                        fillColor: '#0041ff',
-                        fillOpacity: 0.2,
-                        weight: 2
-                    }).addTo(this.map);
-                    circle.bindPopup(`<b>${geofence.name}</b><br>Radius: ${geofence.radius}m`);
-                    this.geofenceCircles.push(circle);
+            checkGeofences() {
+                let status = "Unknown";
+                this.geofences.forEach(g => {
+                    const dist = this.map.distance([this.currentPosition.lat, this.currentPosition.lng], [g.lat, g.lng]);
+                    if (dist <= g.radius) status = g.name;
                 });
+                document.getElementById('status-mode').innerText = status;
+            }
+
+            saveGeofence() {
+                const name = document.getElementById('geofence-name').value;
+                if (!name || !this.selectedLatLng) return alert("Select location and name");
+                this.geofences.push({ name, lat: this.selectedLatLng.lat, lng: this.selectedLatLng.lng, radius: document.getElementById('geofence-radius').value });
+                this.saveData();
+                this.renderGeofenceList();
+                alert("Geofence Added!");
             }
 
             renderGeofenceList() {
-                const container = document.getElementById('geofence-list');
-                container.innerHTML = '';
-
-                this.geofences.forEach(geofence => {
-                    const div = document.createElement('div');
-                    div.className = 'geofence-item';
-                    div.innerHTML = `
-                        <div style="font-size: 0.85rem; font-weight: 600;">${geofence.name}</div>
-                        <div style="font-size: 0.7rem; opacity: 0.9;">${geofence.radius}m</div>
-                    `;
-                    div.onclick = () => {
-                        this.map.setView([geofence.lat, geofence.lng], 16);
-                        document.querySelectorAll('.geofence-item').forEach(el => el.classList.remove('active'));
-                        div.classList.add('active');
-                    };
-                    container.appendChild(div);
+                const list = document.getElementById('geofence-list');
+                list.innerHTML = "<h3>Saved Locations</h3>";
+                this.geofences.forEach(g => {
+                    list.innerHTML += `<p>📍 ${g.name} (${g.radius}m)</p>`;
                 });
             }
 
-            // 8. Haversine Distance Formula
-            getDistance(lat1, lon1, lat2, lon2) {
-                const R = 6371000; // Earth radius in meters
-                const φ1 = lat1 * Math.PI/180;
-                const φ2 = lat2 * Math.PI/180;
-                const Δφ = (lat2-lat1) * Math.PI/180;
-                const Δλ = (lon2-lon1) * Math.PI/180;
-
-                const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-                        Math.cos(φ1) * Math.cos(φ2) *
-                        Math.sin(Δλ/2) * Math.sin(Δλ/2);
-                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-
-                return R * c;
-            }
-
-            // 9. Geofence Logic
-            checkGeofences() {
-                if (!this.currentPosition) return;
-
-                let insideAny = false;
-                let currentZone = 'Unknown';
-
-                for (const geofence of this.geofences) {
-                    const distance = this.getDistance(
-                        this.currentPosition.lat, this.currentPosition.lng,
-                        geofence.lat, geofence.lng
-                    );
-
-                    if (distance <= geofence.radius) {
-                        insideAny = true;
-                        currentZone = geofence.name;
-                        
-                        // Travel automation logic
-                        if (geofence.name.toLowerCase().includes('coaching') && this.timerInterval) {
-                            this.stopTravelTimer();
-                        }
-                        break;
-                    }
-                }
-
-                // Left home geofence
-                if (currentZone === 'Unknown' && !insideAny && 
-                    this.geofences.some(g => g.name.toLowerCase().includes('home'))) {
-                    
-                    const homeGeofence = this.geofences.find(g => g.name.toLowerCase().includes('home'));
-                    const wasInsideHome = this.getDistance(
-                        this.currentPosition.lat, this.currentPosition.lng,
-                        homeGeofence.lat, homeGeofence.lng
-                    ) <= homeGeofence.radius;
-
-                    if (wasInsideHome && !this.timerInterval) {
-                        this.startTravelTimer();
-                    }
-                }
-
-                document.getElementById('status-mode').textContent = `📍 ${currentZone}`;
-            }
-
-            // 10. Travel Timer
-            startTravelTimer() {
-                const timeLeft = this.settings.travelTimer;
-                let elapsed = 0;
-
-                this.timerInterval = setInterval(() => {
-                    elapsed += 1000;
-                    const remaining = Math.max(0, timeLeft - elapsed);
-                    const minutes = Math.floor(remaining / 60000);
-                    const seconds = Math.floor((remaining % 60000) / 1000);
-
-                    document.getElementById('timer-display').textContent = 
-                        `${minutes}:${seconds.toString().padStart(2, '0')} ⏰`;
-
-                    if (remaining === 0) {
-                        this.stopTravelTimer();
-                        this.triggerSOS('Travel timer expired');
-                    }
-                }, 1000);
-
-                document.getElementById('timer-display').style.color = '#ffc107';
-                this.showStatus('Travel timer started', 'warning');
-            }
-
-            stopTravelTimer() {
-                if (this.timerInterval) {
-                    clearInterval(this.timerInterval);
-                    this.timerInterval = null;
-                }
-                document.getElementById('timer-display').textContent = '00:00 ✅';
-                document.getElementById('timer-display').style.color = 'var(--success)';
-            }
-
-            // 11. SOS System
-            async triggerSOS(reason = 'Manual') {
-                if (this.isSOSActive) return;
-
-                this.isSOSActive = true;
-                this.showStatus(`🚨 SOS Triggered: ${reason}`, 'danger');
-
-                // Send initial alert
-                await this.sendSOSAlert(reason);
-
-                // Send live location every 10 seconds
-                this.sosInterval = setInterval(async () => {
-                    await this.sendSOSAlert('Live tracking');
-                }, 10000);
-
-                // Show notification
-                if (Notification.permission === 'granted') {
-                    new Notification('🚨 EMERGENCY SOS ACTIVE', {
-                        body: `SOS triggered: ${reason}\nLive location being shared`,
-                        icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyUzYuNDggMjIgMTIgMjJTMjIgMTcuNTIgMjIgMTJDMTcuNTIgMTIgMTIgNi40OCAxMiAyWiIgZmlsbD0iI2RjMzU0NSIvPgo8cGF0aCBkPSJNMTMgMTNIMTFWLjk5SDEzVjEzWiIgZmlsbD0id2hpdGUiLz4KPC9zdmc+'
-                    });
-                }
-            }
-
-            async sendSOSAlert(reason) {
-                const data = {
-                    lat: this.currentPosition?.lat || 0,
-                    lon: this.currentPosition?.lng || 0,
-                    battery: parseInt(document.getElementById('battery-level').textContent),
-                    timestamp: new Date().toISOString(),
-                    reason: reason,
-                    device: navigator.userAgent
-                };
-
-                try {
-                    // Telegram
-                    if (this.settings.telegramToken && this.settings.telegramChatId) {
-                        await fetch(`https://api.telegram.org/bot${this.settings.telegramToken}/sendMessage`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                chat_id: this.settings.telegramChatId,
-                                text: `🚨 EMERGENCY SOS!\n\n📍 Location: https://maps.google.com/?q=${data.lat},${data.lon}\n🔋 Battery: ${data.battery}%\n⏰ Time: ${new Date(data.timestamp).toLocaleString()}\n📱 Device: ${data.reason}\n\nLive tracking active!`,
-                                disable_web_page_preview: false
-                            })
-                        });
-                    }
-
-                    // Firebase (Public endpoint simulation - replace with your Firebase)
-                    await fetch('https://safety-tracker-123.firebaseio.com/sos_logs.json', {
-                        method: 'POST',
-                        body: JSON.stringify(data),
-                        headers: { 'Content-Type': 'application/json' }
-                    });
-
-                    console.log('SOS sent:', data);
-                } catch (error) {
-                    console.error('SOS send failed:', error);
-                    this.showStatus('SOS sent (check console for details)', 'warning');
-                }
-            }
-
-            stopSOS() {
-                if (this.sosInterval) {
-                    clearInterval(this.sosInterval);
-                    this.sosInterval = null;
-                }
-                this.isSOSActive = false;
-                this.showStatus('SOS stopped', 'success');
-            }
-
-            // 12. Settings
-            testTelegram() {
-                const token = document.getElementById('telegram-token').value;
-                const chatId = document.getElementById('telegram-chatid').value;
-
-                if (!token || !chatId) {
-                    this.showStatus('Please enter Telegram details', 'warning');
-                    return;
-                }
-
-                fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            async sendSOS(reason) {
+                if (!this.settings.telegramToken) return alert("Setup Telegram first!");
+                const url = `https://api.telegram.org/bot${this.settings.telegramToken}/sendMessage`;
+                const text = `🚨 SOS ALERT!\nReason: ${reason}\nLocation: https://www.google.com/maps?q=${this.currentPosition.lat},${this.currentPosition.lng}`;
+                await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        chat_id: chatId,
-                        text: '✅ Safety Tracker test successful                    })
-                })
-                .then(() => this.showStatus('Telegram test sent! Check your chat.', 'success'))
-                .catch(() => this.showStatus('Telegram test failed. Check token/chat ID.', 'error'));
+                    body: JSON.stringify({ chat_id: this.settings.telegramChatId, text })
+                });
             }
 
             saveSettings() {
                 this.settings.telegramToken = document.getElementById('telegram-token').value;
                 this.settings.telegramChatId = document.getElementById('telegram-chatid').value;
-                this.settings.travelTimer = parseInt(document.getElementById('travel-timer').value) * 60 * 1000;
-                
                 this.saveData();
-                this.showStatus('Settings saved', 'success');
+                alert("Settings Saved!");
             }
 
-            // 13. Data Storage
-            saveData() {
-                localStorage.setItem('safety_geofences', JSON.stringify(this.geofences));
-                localStorage.setItem('safety_settings', JSON.stringify(this.settings));
-            }
-
+            saveData() { localStorage.setItem('safety_data', JSON.stringify({ g: this.geofences, s: this.settings })); }
             loadData() {
-                const savedGeofences = localStorage.getItem('safety_geofences');
-                if (savedGeofences) {
-                    this.geofences = JSON.parse(savedGeofences);
-                }
-
-                const savedSettings = localStorage.getItem('safety_settings');
-                if (savedSettings) {
-                    this.settings = { ...this.settings, ...JSON.parse(savedSettings) };
-                }
-
-                // Populate form
-                document.getElementById('telegram-token').value = this.settings.telegramToken;
-                document.getElementById('telegram-chatid').value = this.settings.telegramChatId;
-                document.getElementById('travel-timer').value = (this.settings.travelTimer / 60000).toString();
-
-                this.renderGeofenceList();
+                const data = JSON.parse(localStorage.getItem('safety_data'));
+                if (data) { this.geofences = data.g || []; this.settings = data.s || {}; }
             }
 
-            // 14. UI Updates
             updateUI() {
-                const statusDiv = document.getElementById('current-status');
-                if (!this.isTracking) {
-                    statusDiv.innerHTML = `
-                        <p><strong>Location tracking is OFF</strong></p>
-                        <button class="btn" onclick="tracker.startTracking()">Start Tracking</button>
-                        <p style="font-size: 0.9rem; opacity: 0.7; margin-top: 1rem;">
-                            Tap to monitor geofences and enable emergency features
-                        </p>
-                    `;
-                } else {
-                    statusDiv.innerHTML = `
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                            <span>✅ Tracking Active</span>
-                            <button class="btn" onclick="tracker.stopTracking()" style="width: auto; padding: 0.5rem 1rem;">Stop</button>
-                        </div>
-                        <div style="font-size: 0.9rem; opacity: 0.8;">
-                            <strong>Current:</strong> ${this.currentPosition ? 
-                                `Lat: ${this.currentPosition.lat.toFixed(4)}, Lng: ${this.currentPosition.lng.toFixed(4)}` : 
-                                'Getting location...'}
-                        </div>
-                    `;
-                }
-            }
-
-            // 15. Utility Functions
-            showLoading(text) {
-                document.getElementById('loading-text').textContent = text;
-                document.getElementById('loading').style.display = 'block';
-            }
-
-            hideLoading() {
-                document.getElementById('loading').style.display = 'none';
-            }
-
-            showStatus(message, type = 'info') {
-                const statusEl = document.getElementById('status-message');
-                statusEl.textContent = message;
-                statusEl.style.background = type === 'success' ? 'var(--success)' :
-                                   type === 'error' ? 'var(--danger)' :
-                                   type === 'warning' ? 'var(--warning)' : 'var(--primary)';
-                
-                statusEl.style.display = 'block';
-                setTimeout(() => {
-                    statusEl.style.display = 'none';
-                }, 4000);
-            }
-
-            showConfirm(title, message, callback) {
-                document.getElementById('modal-title').textContent = title;
-                document.getElementById('modal-message').textContent = message;
-                document.getElementById('confirm-modal').style.display = 'block';
-                window.confirmCallback = callback;
+                document.getElementById('current-status').innerHTML = `<p>Tracking is Active ✅</p><button class="btn" style="background:#888" onclick="location.reload()">Stop Tracking</button>`;
             }
         }
 
-        // Global Functions
-        let tracker;
+        const tracker = new SafetyTracker();
 
-        function initApp() {
-            tracker = new SafetyGeofenceTracker();
-        }
-
-        function saveGeofence() {
-            tracker.saveGeofence();
-        }
-
-        function testTelegram() {
-            tracker.testTelegram();
-        }
-
-        function saveSettings() {
-            tracker.saveSettings();
-        }
-
-        function triggerSOS(reason = 'Manual') {
-            tracker.showConfirm('🚨 EMERGENCY SOS', 
-                'This will send your live location to contacts. Confirm?', 
-                () => tracker.triggerSOS(reason));
-        }
-
-        function confirmAction() {
-            if (window.confirmCallback) {
-                window.confirmCallback();
-            }
-            closeModal();
-        }
-
-        function closeModal() {
-            document.getElementById('confirm-modal').style.display = 'none';
-        }
-
-        // Tab Navigation
-        document.addEventListener('DOMContentLoaded', function() {
-            const tabs = document.querySelectorAll('.nav-tab');
-            const contents = document.querySelectorAll('.tab-content');
-
-            tabs.forEach(tab => {
-                tab.addEventListener('click', () => {
-                    const target = tab.dataset.tab;
-
-                    // Update active tab
-                    tabs.forEach(t => t.classList.remove('active'));
-                    contents.forEach(c => c.classList.remove('active'));
-                    tab.classList.add('active');
-                    document.getElementById(target).classList.add('active');
-
-                    // Load geofences list when tab active
-                    if (target === 'geofences') {
-                        tracker.renderGeofenceList();
-                    }
-                });
+        // UI Tabs Logic
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.nav-tab, .tab-content').forEach(el => el.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.add('active');
+                tracker.map.invalidateSize();
             });
-
-            // PWA Install Prompt
-            let deferredPrompt;
-            window.addEventListener('beforeinstallprompt', (e) => {
-                deferredPrompt = e;
-                tracker.showStatus('Install app for background tracking?', 'info');
-            });
-
-            // Install button handler
-            document.addEventListener('click', (e) => {
-                if (e.target.matches('[data-install-app]')) {
-                    deferredPrompt.prompt();
-                    deferredPrompt.userChoice.then(() => {
-                        deferredPrompt = null;
-                    });
-                }
-            });
-
-            // Service Worker Registration
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('sw.js')
-                    .then(reg => console.log('SW registered'))
-                    .catch(err => console.log('SW registration failed'));
-            }
-
-            initApp();
         });
 
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 's' && e.ctrlKey) {
-                e.preventDefault();
-                tracker.startTracking();
-            }
-            if (e.key === 't' && e.ctrlKey) {
-                tracker.stopTracking();
-            }
-        });
+        function triggerSOS() {
+            document.getElementById('modal-message').innerText = "Send emergency alert to your contacts?";
+            document.getElementById('confirm-modal').style.display = 'block';
+            window.confirmCallback = () => tracker.sendSOS("Manual SOS");
+        }
 
-        // Prevent zoom on mobile
-        document.addEventListener('touchstart', function(event) {
-            if (event.touches.length > 1) {
-                event.preventDefault();
-            }
-        });
-
-        let lastTouchEnd = 0;
-        document.addEventListener('touchend', function(event) {
-            const now = (new Date()).getTime();
-            if (now - lastTouchEnd <= 300) {
-                event.preventDefault();
-            }
-            lastTouchEnd = now;
-        }, false);
+        function confirmAction() { if(window.confirmCallback) window.confirmCallback(); closeModal(); }
+        function closeModal() { document.getElementById('confirm-modal').style.display = 'none'; }
     </script>
 </body>
 </html>
