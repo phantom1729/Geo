@@ -175,6 +175,7 @@
             height: 100%;
             width: 100%;
             border-radius: 16px;
+            z-index: 1; /* Fix map overlay issue */
         }
 
         /* Cards */
@@ -427,7 +428,7 @@
                     <small>Battery</small>
                 </div>
                 <div class="status-item">
-                    <span id="status-mode">🏠 Home</span>
+                    <span id="status-mode">❓ Unknown Area</span>
                     <small>Mode</small>
                 </div>
                 <div class="status-item">
@@ -461,20 +462,20 @@
                     <h3>➕ Add New Geofence</h3>
                     <div class="form-group">
                         <label>Name</label>
-                        <input type="text" id="geofence-name" placeholder="Home, School, etc.">
+                        <input type="text" id="geofence-name" placeholder="Home, Office, etc.">
                     </div>
                     <div class="form-group">
-                        <label>Tap on map to set location</label>
-                        <p id="geofence-coords">No location selected</p>
+                        <label>Tap on map to set location & drag to adjust</label>
+                        <p id="geofence-coords" style="color: var(--primary-dark); font-weight: bold;">No location selected</p>
                     </div>
                     <div class="form-group">
                         <label>Radius (meters)</label>
-                        <input type="number" id="geofence-radius" value="20" min="5" max="500">
+                        <input type="number" id="geofence-radius" value="50" min="5" max="500">
                     </div>
                     <button class="btn" onclick="saveGeofence()">Save Geofence</button>
                 </div>
                 <div class="card">
-                    <h3>📍 Saved Locations</h3>
+                    <h3>📍 Saved Zones</h3>
                     <div id="geofence-list" class="geofence-list"></div>
                 </div>
             </div>
@@ -488,7 +489,7 @@
                     </div>
                     <div class="form-group">
                         <label>Chat ID</label>
-                        <input type="text" id="telegram-chatid" placeholder="@username or 123456789">
+                        <input type="text" id="telegram-chatid" placeholder="123456789">
                     </div>
                     <button class="btn" onclick="testTelegram()">Test Telegram</button>
                 </div>
@@ -530,7 +531,7 @@
             </div>
         </div>
 
-        <div id="status-message" style="position: fixed; top: 100px; left: 50%; transform: translateX(-50%); padding: 1rem; background: rgba(0,0,0,0.8); color: white; border-radius: 12px; display: none; z-index: 2500;"></div>
+        <div id="status-message" style="position: fixed; top: 100px; left: 50%; transform: translateX(-50%); padding: 1rem; background: rgba(0,0,0,0.8); color: white; border-radius: 12px; display: none; z-index: 2500; text-align: center; max-width: 90%;"></div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -544,12 +545,13 @@
             constructor() {
                 this.map = null;
                 this.userMarker = null;
+                this.selectionMarker = null; // Used for temporary geofence picking
                 this.geofenceMarkers = [];
                 this.geofenceCircles = [];
                 this.watchId = null;
                 this.isTracking = false;
                 this.currentPosition = null;
-                this.selectedGeofenceLocation = null; // Bug fix: Added missing variable
+                this.selectedGeofenceLocation = null;
                 this.geofences = [];
                 this.settings = {
                     telegramToken: '',
@@ -592,7 +594,7 @@
 
             // 2. Map Initialization (Leaflet/OpenStreetMap)
             async initMap() {
-                // Default to user's location or Delhi, India
+                // Default fallback location
                 const defaultLat = 28.6139;
                 const defaultLng = 77.2090;
 
@@ -608,9 +610,10 @@
                     attribution: '© OpenStreetMap contributors'
                 }).addTo(this.map);
 
-                // Click to add geofence
+                // Click to add/update temporary geofence marker
                 this.map.on('click', (e) => {
-                    if (document.querySelector('.nav-tab.active').dataset.tab === 'geofences') {
+                    const activeTab = document.querySelector('.nav-tab.active');
+                    if (activeTab && activeTab.dataset.tab === 'geofences') {
                         this.setGeofenceLocation(e.latlng);
                     }
                 });
@@ -618,7 +621,7 @@
                 // Load existing geofences
                 this.loadGeofencesOnMap();
 
-                // Try to get current location
+                // Try to get current location initially
                 this.getCurrentLocation();
             }
 
@@ -695,7 +698,7 @@
                     }
                 );
 
-                this.showStatus('Tracking started', 'success');
+                this.showStatus('Live Tracking Activated', 'success');
                 this.updateUI();
             }
 
@@ -717,7 +720,7 @@
                     accuracy: position.coords.accuracy
                 };
 
-                // Update user marker
+                // Update user marker smoothly
                 if (this.userMarker) {
                     this.userMarker.setLatLng([this.currentPosition.lat, this.currentPosition.lng]);
                 } else {
@@ -731,12 +734,11 @@
                     }).addTo(this.map);
                 }
 
-                // Center map on user (with offset)
+                // Smoothly pan map to user
                 this.map.panTo([this.currentPosition.lat, this.currentPosition.lng], { animate: true });
 
-                // Check geofences
+                // Check geofences in real-time
                 this.checkGeofences();
-
                 this.updateUI();
             }
 
@@ -766,69 +768,100 @@
                         this.map.setView([this.currentPosition.lat, this.currentPosition.lng], 15);
                     },
                     () => {
-                        // Fallback to default location
-                        this.map.setView([28.6139, 77.2090], 15);
+                        console.warn("Could not retrieve initial location.");
                     },
                     { enableHighAccuracy: true }
                 );
             }
 
-            // 7. Geofencing System
+            // 7. Geofencing System & Temporary UI Selection Logic
             setGeofenceLocation(latlng) {
-                this.selectedGeofenceLocation = latlng; // Bug fix: Save the selected location
+                this.selectedGeofenceLocation = latlng;
                 document.getElementById('geofence-coords').textContent = 
                     `Lat: ${latlng.lat.toFixed(6)}, Lng: ${latlng.lng.toFixed(6)}`;
+
+                // Create or move the draggable selection marker
+                if (!this.selectionMarker) {
+                    // Using a distinct red marker for the selection phase
+                    const redIcon = new L.Icon({
+                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                        iconSize: [25, 41],
+                        iconAnchor: [12, 41],
+                        popupAnchor: [1, -34],
+                        shadowSize: [41, 41]
+                    });
+
+                    this.selectionMarker = L.marker(latlng, {
+                        draggable: true,
+                        icon: redIcon
+                    }).addTo(this.map).bindPopup("Drag me to adjust").openPopup();
+
+                    // Update coordinates when user drags the marker
+                    this.selectionMarker.on('dragend', (e) => {
+                        const newPos = e.target.getLatLng();
+                        this.selectedGeofenceLocation = newPos;
+                        document.getElementById('geofence-coords').textContent = 
+                            `Lat: ${newPos.lat.toFixed(6)}, Lng: ${newPos.lng.toFixed(6)}`;
+                    });
+                } else {
+                    this.selectionMarker.setLatLng(latlng);
+                    this.selectionMarker.openPopup();
+                }
             }
 
             async saveGeofence() {
                 const name = document.getElementById('geofence-name').value.trim();
                 const radius = parseInt(document.getElementById('geofence-radius').value);
                 
-                // Bug fix: Check selectedGeofenceLocation instead of currentPosition
                 if (!name || !this.selectedGeofenceLocation) {
-                    this.showStatus('Please enter name and tap map to select location', 'warning');
+                    this.showStatus('Please enter a name and tap the map to set a location.', 'warning');
                     return;
                 }
 
                 const geofence = {
                     id: Date.now().toString(),
                     name,
-                    // Bug fix: Use selectedGeofenceLocation
                     lat: this.selectedGeofenceLocation.lat,
                     lng: this.selectedGeofenceLocation.lng,
-                    radius: radius || 20,
+                    radius: radius || 50,
                     created: new Date().toISOString()
                 };
 
+                // Add to array, save, and update map immediately
                 this.geofences.push(geofence);
                 this.saveData();
                 this.loadGeofencesOnMap();
                 this.renderGeofenceList();
 
-                // Reset UI and selected location
+                // Clear the temporary selection marker
+                if (this.selectionMarker) {
+                    this.map.removeLayer(this.selectionMarker);
+                    this.selectionMarker = null;
+                }
+
+                // Reset inputs
                 document.getElementById('geofence-name').value = '';
                 document.getElementById('geofence-coords').textContent = 'No location selected';
-                this.selectedGeofenceLocation = null; // Bug fix: Reset after saving
+                this.selectedGeofenceLocation = null; 
                 
-                this.showStatus(`Geofence "${name}" saved`, 'success');
+                this.showStatus(`Geofence "${name}" saved and added to map!`, 'success');
             }
 
             loadGeofencesOnMap() {
-                // Clear existing
+                // Clear existing markers and circles first
                 this.geofenceMarkers.forEach(marker => this.map.removeLayer(marker));
                 this.geofenceCircles.forEach(circle => this.map.removeLayer(circle));
                 this.geofenceMarkers = [];
                 this.geofenceCircles = [];
 
                 this.geofences.forEach(geofence => {
-                    // Marker
                     const marker = L.marker([geofence.lat, geofence.lng], {
                         title: geofence.name
                     }).addTo(this.map);
                     marker.bindPopup(`<b>${geofence.name}</b><br>Radius: ${geofence.radius}m`);
                     this.geofenceMarkers.push(marker);
 
-                    // Circle
                     const circle = L.circle([geofence.lat, geofence.lng], {
                         radius: geofence.radius,
                         color: '#0041ff',
@@ -850,7 +883,7 @@
                     div.className = 'geofence-item';
                     div.innerHTML = `
                         <div style="font-size: 0.85rem; font-weight: 600;">${geofence.name}</div>
-                        <div style="font-size: 0.7rem; opacity: 0.9;">${geofence.radius}m</div>
+                        <div style="font-size: 0.7rem; opacity: 0.9;">${geofence.radius}m Radius</div>
                     `;
                     div.onclick = () => {
                         this.map.setView([geofence.lat, geofence.lng], 16);
@@ -877,12 +910,12 @@
                 return R * c;
             }
 
-            // 9. Geofence Logic
+            // 9. Live Geofence Evaluation Logic
             checkGeofences() {
                 if (!this.currentPosition) return;
 
                 let insideAny = false;
-                let currentZone = 'Unknown';
+                let currentZone = 'Unknown Area';
 
                 for (const geofence of this.geofences) {
                     const distance = this.getDistance(
@@ -902,15 +935,16 @@
                     }
                 }
 
-                // Left home geofence
-                if (currentZone === 'Unknown' && !insideAny && 
+                // Left home geofence logic
+                if (currentZone === 'Unknown Area' && !insideAny && 
                     this.geofences.some(g => g.name.toLowerCase().includes('home'))) {
                     
                     const homeGeofence = this.geofences.find(g => g.name.toLowerCase().includes('home'));
-                    const wasInsideHome = this.getDistance(
+                    const distanceToHome = this.getDistance(
                         this.currentPosition.lat, this.currentPosition.lng,
                         homeGeofence.lat, homeGeofence.lng
-                    ) <= homeGeofence.radius;
+                    );
+                    const wasInsideHome = distanceToHome <= homeGeofence.radius;
 
                     if (wasInsideHome && !this.timerInterval) {
                         this.startTravelTimer();
@@ -954,7 +988,7 @@
             }
 
             // 11. SOS System
-            async triggerSOS(reason = 'Manual') {
+            async triggerSOS(reason = 'Manual Request') {
                 if (this.isSOSActive) return;
 
                 this.isSOSActive = true;
@@ -963,55 +997,60 @@
                 // Send initial alert
                 await this.sendSOSAlert(reason);
 
-                // Send live location every 10 seconds
+                // Re-send live location repeatedly
                 this.sosInterval = setInterval(async () => {
-                    await this.sendSOSAlert('Live tracking');
-                }, 10000);
+                    await this.sendSOSAlert('Live tracking update');
+                }, 15000); // 15 seconds to avoid rate limiting
 
                 // Show notification
                 if (Notification.permission === 'granted') {
                     new Notification('🚨 EMERGENCY SOS ACTIVE', {
-                        body: `SOS triggered: ${reason}\nLive location being shared`,
+                        body: `SOS triggered: ${reason}\nLive location being shared to emergency contacts.`,
                         icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyUzYuNDggMjIgMTIgMjJTMjIgMTcuNTIgMjIgMTJDMTcuNTIgMTIgMTIgNi40OCAxMiAyWiIgZmlsbD0iI2RjMzU0NSIvPgo8cGF0aCBkPSJNMTMgMTNIMTFWLjk5SDEzVjEzWiIgZmlsbD0id2hpdGUiLz4KPC9zdmc+'
                     });
                 }
             }
 
             async sendSOSAlert(reason) {
-                const data = {
-                    lat: this.currentPosition?.lat || 0,
-                    lon: this.currentPosition?.lng || 0,
-                    battery: parseInt(document.getElementById('battery-level').textContent),
-                    timestamp: new Date().toISOString(),
-                    reason: reason,
-                    device: navigator.userAgent
-                };
+                // Determine coordinates (fall back to unknown if missing)
+                const lat = this.currentPosition ? this.currentPosition.lat.toFixed(6) : 'Unknown';
+                const lon = this.currentPosition ? this.currentPosition.lng.toFixed(6) : 'Unknown';
+                const batteryEl = document.getElementById('battery-level').textContent;
+                const timestamp = new Date().toLocaleString();
 
                 try {
-                    // Telegram
+                    // Telegram Bot Fetch Implementation
                     if (this.settings.telegramToken && this.settings.telegramChatId) {
+                        
+                        let messageText = `🚨 *EMERGENCY SOS TRIGGERED* 🚨\n\n`;
+                        messageText += `*Reason:* ${reason}\n`;
+                        messageText += `*Time:* ${timestamp}\n`;
+                        messageText += `*Battery:* ${batteryEl}\n`;
+                        
+                        if (lat !== 'Unknown') {
+                            messageText += `*Location:* https://maps.google.com/?q=${lat},${lon}\n\n`;
+                            messageText += `_Live tracking activated._`;
+                        } else {
+                            messageText += `*Location:* GPS unavailable.`;
+                        }
+
                         await fetch(`https://api.telegram.org/bot${this.settings.telegramToken}/sendMessage`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 chat_id: this.settings.telegramChatId,
-                                text: `🚨 EMERGENCY SOS!\n\n📍 Location: https://maps.google.com/?q=${data.lat},${data.lon}\n🔋 Battery: ${data.battery}%\n⏰ Time: ${new Date(data.timestamp).toLocaleString()}\n📱 Device: ${data.reason}\n\nLive tracking active!`,
+                                text: messageText,
+                                parse_mode: "Markdown",
                                 disable_web_page_preview: false
                             })
                         });
+                        console.log('SOS sent to Telegram successfully.');
+                    } else {
+                        console.warn("Telegram Token or Chat ID not configured.");
                     }
-
-                    // Firebase (Public endpoint simulation - replace with your Firebase)
-                    await fetch('https://safety-tracker-123.firebaseio.com/sos_logs.json', {
-                        method: 'POST',
-                        body: JSON.stringify(data),
-                        headers: { 'Content-Type': 'application/json' }
-                    });
-
-                    console.log('SOS sent:', data);
                 } catch (error) {
-                    console.error('SOS send failed:', error);
-                    this.showStatus('SOS sent (check console for details)', 'warning');
+                    console.error('SOS fetch failed:', error);
+                    this.showStatus('Failed to send SOS! Check connection.', 'danger');
                 }
             }
 
@@ -1021,7 +1060,7 @@
                     this.sosInterval = null;
                 }
                 this.isSOSActive = false;
-                this.showStatus('SOS stopped', 'success');
+                this.showStatus('SOS cancelled', 'success');
             }
 
             // 12. Settings
@@ -1030,7 +1069,7 @@
                 const chatId = document.getElementById('telegram-chatid').value;
 
                 if (!token || !chatId) {
-                    this.showStatus('Please enter Telegram details', 'warning');
+                    this.showStatus('Please enter both Token and Chat ID', 'warning');
                     return;
                 }
 
@@ -1039,20 +1078,27 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         chat_id: chatId,
-                        text: '✅ Safety Tracker test successful!'
+                        text: '✅ *Safety Tracker* configuration test successful!',
+                        parse_mode: 'Markdown'
                     })
                 })
-                .then(() => this.showStatus('Telegram test sent! Check your chat.', 'success'))
-                .catch(() => this.showStatus('Telegram test failed. Check token/chat ID.', 'error'));
+                .then(response => {
+                    if (response.ok) {
+                        this.showStatus('Telegram connection successful! Check your chat.', 'success');
+                    } else {
+                        this.showStatus('Telegram test failed. Verify token/chat ID.', 'error');
+                    }
+                })
+                .catch(() => this.showStatus('Network error during Telegram test.', 'error'));
             }
 
             saveSettings() {
-                this.settings.telegramToken = document.getElementById('telegram-token').value;
-                this.settings.telegramChatId = document.getElementById('telegram-chatid').value;
+                this.settings.telegramToken = document.getElementById('telegram-token').value.trim();
+                this.settings.telegramChatId = document.getElementById('telegram-chatid').value.trim();
                 this.settings.travelTimer = parseInt(document.getElementById('travel-timer').value) * 60 * 1000;
                 
                 this.saveData();
-                this.showStatus('Settings saved', 'success');
+                this.showStatus('Settings saved securely', 'success');
             }
 
             // 13. Data Storage
@@ -1072,9 +1118,8 @@
                     this.settings = { ...this.settings, ...JSON.parse(savedSettings) };
                 }
 
-                // Populate form
-                document.getElementById('telegram-token').value = this.settings.telegramToken;
-                document.getElementById('telegram-chatid').value = this.settings.telegramChatId;
+                document.getElementById('telegram-token').value = this.settings.telegramToken || '';
+                document.getElementById('telegram-chatid').value = this.settings.telegramChatId || '';
                 document.getElementById('travel-timer').value = (this.settings.travelTimer / 60000).toString();
 
                 this.renderGeofenceList();
@@ -1085,22 +1130,23 @@
                 const statusDiv = document.getElementById('current-status');
                 if (!this.isTracking) {
                     statusDiv.innerHTML = `
-                        <p><strong>Location tracking is OFF</strong></p>
-                        <button class="btn" onclick="tracker.startTracking()">Start Tracking</button>
+                        <p><strong>Location tracking is currently OFF</strong></p>
+                        <button class="btn btn-success" onclick="tracker.startTracking()">Start Tracking</button>
                         <p style="font-size: 0.9rem; opacity: 0.7; margin-top: 1rem;">
-                            Tap to monitor geofences and enable emergency features
+                            Tap to start actively monitoring geofences and enabling smart features.
                         </p>
                     `;
                 } else {
                     statusDiv.innerHTML = `
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                            <span>✅ Tracking Active</span>
-                            <button class="btn" onclick="tracker.stopTracking()" style="width: auto; padding: 0.5rem 1rem;">Stop</button>
+                            <span style="color: var(--success); font-weight: bold;">✅ Tracking Active</span>
+                            <button class="btn btn-danger" onclick="tracker.stopTracking()" style="width: auto; padding: 0.5rem 1rem;">Stop</button>
                         </div>
                         <div style="font-size: 0.9rem; opacity: 0.8;">
-                            <strong>Current:</strong> ${this.currentPosition ? 
-                                `Lat: ${this.currentPosition.lat.toFixed(4)}, Lng: ${this.currentPosition.lng.toFixed(4)}` : 
-                                'Getting location...'}
+                            <strong>Current Live GPS:</strong><br>
+                            ${this.currentPosition ? 
+                                `Lat: ${this.currentPosition.lat.toFixed(5)}, Lng: ${this.currentPosition.lng.toFixed(5)}<br>Accuracy: ±${Math.round(this.currentPosition.accuracy)}m` : 
+                                'Acquiring satellite lock...'}
                         </div>
                     `;
                 }
@@ -1120,7 +1166,7 @@
                 const statusEl = document.getElementById('status-message');
                 statusEl.textContent = message;
                 statusEl.style.background = type === 'success' ? 'var(--success)' :
-                                   type === 'error' ? 'var(--danger)' :
+                                   type === 'danger' ? 'var(--danger)' :
                                    type === 'warning' ? 'var(--warning)' : 'var(--primary)';
                 
                 statusEl.style.display = 'block';
@@ -1137,7 +1183,7 @@
             }
         }
 
-        // Global Functions
+        // Global Instance
         let tracker;
 
         function initApp() {
@@ -1156,10 +1202,16 @@
             tracker.saveSettings();
         }
 
-        function triggerSOS(reason = 'Manual') {
-            tracker.showConfirm('🚨 EMERGENCY SOS', 
-                'This will send your live location to contacts. Confirm?', 
-                () => tracker.triggerSOS(reason));
+        function triggerSOS(reason = 'Manual Request') {
+            if (tracker.isSOSActive) {
+                tracker.showConfirm('Cancel SOS?', 'Do you want to stop the emergency broadcast?', () => {
+                    tracker.stopSOS();
+                });
+            } else {
+                tracker.showConfirm('🚨 EMERGENCY SOS', 
+                    'This will immediately send your live location to your connected Telegram bot. Continue?', 
+                    () => tracker.triggerSOS(reason));
+            }
         }
 
         function confirmAction() {
@@ -1173,7 +1225,7 @@
             document.getElementById('confirm-modal').style.display = 'none';
         }
 
-        // Tab Navigation
+        // Tab Navigation Logic
         document.addEventListener('DOMContentLoaded', function() {
             const tabs = document.querySelectorAll('.nav-tab');
             const contents = document.querySelectorAll('.tab-content');
@@ -1182,15 +1234,23 @@
                 tab.addEventListener('click', () => {
                     const target = tab.dataset.tab;
 
-                    // Update active tab
+                    // Update UI state
                     tabs.forEach(t => t.classList.remove('active'));
                     contents.forEach(c => c.classList.remove('active'));
                     tab.classList.add('active');
                     document.getElementById(target).classList.add('active');
 
-                    // Load geofences list when tab active
+                    // If viewing geofences, refresh the list
                     if (target === 'geofences') {
                         tracker.renderGeofenceList();
+                    }
+
+                    // Map Layout Fix: Trigger invalidateSize on the map when it becomes visible again
+                    // Delaying slightly to ensure DOM transitions/displays are complete
+                    if ((target === 'dashboard' || target === 'geofences') && tracker && tracker.map) {
+                        setTimeout(() => {
+                            tracker.map.invalidateSize();
+                        }, 100); 
                     }
                 });
             });
@@ -1199,12 +1259,12 @@
             let deferredPrompt;
             window.addEventListener('beforeinstallprompt', (e) => {
                 deferredPrompt = e;
-                tracker.showStatus('Install app for background tracking?', 'info');
+                console.log('App ready for install');
             });
 
-            // Install button handler
+            // Install button handler simulation
             document.addEventListener('click', (e) => {
-                if (e.target.matches('[data-install-app]')) {
+                if (e.target.matches('[data-install-app]') && deferredPrompt) {
                     deferredPrompt.prompt();
                     deferredPrompt.userChoice.then(() => {
                         deferredPrompt = null;
@@ -1216,7 +1276,7 @@
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.register('sw.js')
                     .then(reg => console.log('SW registered'))
-                    .catch(err => console.log('SW registration failed'));
+                    .catch(err => console.log('SW registration missing/failed (expected in dev mode)'));
             }
 
             initApp();
@@ -1229,16 +1289,17 @@
                 tracker.startTracking();
             }
             if (e.key === 't' && e.ctrlKey) {
+                e.preventDefault();
                 tracker.stopTracking();
             }
         });
 
-        // Prevent zoom on mobile
+        // Prevent heavy zooming on mobile forms
         document.addEventListener('touchstart', function(event) {
             if (event.touches.length > 1) {
                 event.preventDefault();
             }
-        });
+        }, { passive: false });
 
         let lastTouchEnd = 0;
         document.addEventListener('touchend', function(event) {
