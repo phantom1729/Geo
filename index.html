@@ -549,6 +549,7 @@
                 this.watchId = null;
                 this.isTracking = false;
                 this.currentPosition = null;
+                this.selectedGeofenceLocation = null; // Bug fix: Added missing variable
                 this.geofences = [];
                 this.settings = {
                     telegramToken: '',
@@ -774,6 +775,7 @@
 
             // 7. Geofencing System
             setGeofenceLocation(latlng) {
+                this.selectedGeofenceLocation = latlng; // Bug fix: Save the selected location
                 document.getElementById('geofence-coords').textContent = 
                     `Lat: ${latlng.lat.toFixed(6)}, Lng: ${latlng.lng.toFixed(6)}`;
             }
@@ -782,16 +784,18 @@
                 const name = document.getElementById('geofence-name').value.trim();
                 const radius = parseInt(document.getElementById('geofence-radius').value);
                 
-                if (!name || !this.currentPosition) {
-                    this.showStatus('Please enter name and select location', 'warning');
+                // Bug fix: Check selectedGeofenceLocation instead of currentPosition
+                if (!name || !this.selectedGeofenceLocation) {
+                    this.showStatus('Please enter name and tap map to select location', 'warning');
                     return;
                 }
 
                 const geofence = {
                     id: Date.now().toString(),
                     name,
-                    lat: this.currentPosition.lat,
-                    lng: this.currentPosition.lng,
+                    // Bug fix: Use selectedGeofenceLocation
+                    lat: this.selectedGeofenceLocation.lat,
+                    lng: this.selectedGeofenceLocation.lng,
                     radius: radius || 20,
                     created: new Date().toISOString()
                 };
@@ -801,8 +805,11 @@
                 this.loadGeofencesOnMap();
                 this.renderGeofenceList();
 
+                // Reset UI and selected location
                 document.getElementById('geofence-name').value = '';
                 document.getElementById('geofence-coords').textContent = 'No location selected';
+                this.selectedGeofenceLocation = null; // Bug fix: Reset after saving
+                
                 this.showStatus(`Geofence "${name}" saved`, 'success');
             }
 
