@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Safetyy Geofence Tracker - PWA</title>
+    <title>Rakshak Elite - Safety Tracker</title>
     
     <link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIlNhZmV0eSBHZW9mZW5jZSBUcmFja2VyIiwKICAic2hvcnRfbmFtZSI6ICJTYWZlVHJhY2tlciIsCiAgInN0YXJ0X3VybCI6ICIvIiwKICAiZGlzcGxheSI6ICJzdGFuZGFsb25lIiwKICAiYmFja2dyb3VuZF9jb2xvciI6ICIjZmYzZGRiIiwKICAidGhlbWVfY29sb3IiOiAiIzAwNDFmZiIsCiAgImljb25zIjogWwogICAgewogICAgICAic3JjIjogImRhdGE6aW1hZ2Uvc3ZnK2Jhc2U2NCxQSE4yWkdHZ1lXMWxJaUF2Y2daR2R5YVhSMGNITTZMeTlqYjJ4cFoyMWlMbTl2YTJsbGNpNXRkR1Z5YkdGemN5NXBiMjluYkdVdWJHOW5LQzF1YVc5dWN5NXBiMjluYkdVdWJHOW5LQzF1YVc5dWN5NXBiMjluYkdVdWJHOW5LQzF1YVc5dU1IQWdiR1ZqZEdGemN5NXBiMjluYkdVdWJHOW5LQzF1YVc5dSIsCiAgICAgICJzaXplcyI6ICIxOTJ4MTkyIiwKICAgICAgInR5cGUiOiAiaW1hZ2Uvc3ZnK3htbCIsCiAgICAgICJwdXJwb3NlIjogIm1hc2sgYWJsZSIKICAgIH0KICBdCn0=">
     
@@ -68,6 +68,7 @@
         .btn-success:hover { background: #218838; }
         .btn-danger { background: var(--danger); }
         .btn-danger:hover { background: #c82333; }
+        .btn-warning { background: var(--warning); color: var(--dark); }
         
         /* Navigation */
         .nav-tabs { display: flex; background: rgba(255,255,255,0.9); border-radius: 12px; overflow: hidden; margin-bottom: 1rem; box-shadow: var(--shadow); position: relative; z-index: 10; }
@@ -76,7 +77,7 @@
         
         /* Modal & Loading */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 3000; backdrop-filter: blur(10px); }
-        .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 20px; max-width: 90%; max-height: 90%; overflow-y: auto; }
+        .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 20px; max-width: 90%; max-height: 90%; overflow-y: auto; text-align: center; }
         .close-modal { position: absolute; top: 1rem; right: 1.5rem; font-size: 2rem; cursor: pointer; color: #999; }
         .loading { display: none; text-align: center; padding: 2rem; }
         .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 1rem; }
@@ -127,8 +128,8 @@
                     <div id="map"></div>
                 </div>
                 <div class="card">
-                    <h3>📍 Current Status</h3>
-                    <div id="current-status">
+                    <h3>📍 Trip Status</h3>
+                    <div id="current-status" style="text-align: center;">
                         <p>Initializing Rakshak Systems...</p>
                     </div>
                 </div>
@@ -136,7 +137,7 @@
 
             <div id="geofences" class="tab-content">
                 <div class="card">
-                    <h3>➕ Add New Geofence</h3>
+                    <h3>➕ Add Safe Zone</h3>
                     <div class="form-group">
                         <label>Name (e.g., Home, Office, Coaching)</label>
                         <input type="text" id="geofence-name" placeholder="Home, Office, etc.">
@@ -171,7 +172,7 @@
                     <button class="btn" onclick="testTelegram()">Test Telegram</button>
                 </div>
                 <div class="card">
-                    <h3>⏱️ Timer Settings</h3>
+                    <h3>⏱️ Default Timer Settings</h3>
                     <div class="form-group">
                         <label>Expected Travel Time (minutes)</label>
                         <select id="travel-timer">
@@ -201,9 +202,9 @@
                 <span class="close-modal" onclick="closeModal()">×</span>
                 <h2 id="modal-title">Confirm Action</h2>
                 <p id="modal-message"></p>
-                <div style="display: flex; gap: 1rem; margin-top: 2rem;">
-                    <button class="btn btn-danger" id="modal-confirm" onclick="confirmAction()">Confirm</button>
-                    <button class="btn" onclick="closeModal()">Cancel</button>
+                <div style="display: flex; justify-content: center; gap: 1rem; margin-top: 1.5rem;">
+                    <button class="btn btn-danger" id="modal-confirm" onclick="confirmAction()" style="width:auto;">Confirm</button>
+                    <button class="btn" onclick="closeModal()" style="width:auto; background:#6c757d;">Cancel</button>
                 </div>
             </div>
         </div>
@@ -226,13 +227,17 @@
                 this.currentPosition = null;
                 this.selectedGeofenceLocation = null;
                 this.geofences = [];
-                this.tripStarted = false; // Tracks if user is actively traveling
+                
+                // NEW STATE VARIABLES FOR SMART LOGIC
+                this.isArmed = false; // User has pressed "Start My Trip"
+                this.timerInterval = null; // Holds the active timer
+                
                 this.settings = {
                     telegramToken: '',
                     telegramChatId: '',
                     travelTimer: 10 * 60 * 1000 
                 };
-                this.timerInterval = null;
+                
                 this.sosInterval = null;
                 this.isSOSActive = false;
                 this.shakeThreshold = 25;
@@ -242,22 +247,23 @@
             }
 
             async init() {
-                this.showLoading('Initializing app...');
+                this.showLoading('Starting Rakshak...');
                 this.loadData();
                 await this.initMap();
                 this.requestPermissions();
                 this.initBatteryMonitor();
                 this.initShakeDetection();
                 
-                // Rakshak Auto-Tracking Feature
+                // Track GPS continuously in the background to ensure lock
                 this.startTracking(); 
                 
                 this.hideLoading();
             }
 
             async initMap() {
-                const defaultLat = 28.6139;
-                const defaultLng = 77.2090;
+                // Defaulting to Danapur, Bihar
+                const defaultLat = 25.6322;
+                const defaultLng = 85.0487;
                 this.map = L.map('map', { zoomControl: true, zoom: 15, minZoom: 10, maxZoom: 20 }).setView([defaultLat, defaultLng], 15);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(this.map);
                 
@@ -312,7 +318,7 @@
             startTracking() {
                 if (this.watchId) return;
                 this.isTracking = true;
-                document.getElementById('status-tracking').textContent = '🔄 Auto-Tracking';
+                document.getElementById('status-tracking').textContent = '🔄 Online';
                 this.watchId = navigator.geolocation.watchPosition(
                     (pos) => this.onLocationUpdate(pos),
                     (err) => this.onLocationError(err),
@@ -332,9 +338,8 @@
                 }
                 this.map.panTo([this.currentPosition.lat, this.currentPosition.lng], { animate: true });
                 
-                // Core Logic Call
+                // Run the safety checking logic
                 this.checkGeofences();
-                this.updateUI();
             }
 
             onLocationError(error) {
@@ -426,15 +431,34 @@
             }
 
             // ==========================================
-            // CORE LOGIC: Universal Departure & Arrival
+            // SMART LOGIC: No more Ghost Starts!
             // ==========================================
+            
+            // Called from HTML Button
+            manualStart() {
+                this.isArmed = true;
+                this.showStatus('System Armed. Waiting to leave safe zone...', 'success');
+                this.updateUI();
+                this.checkGeofences(); // Force check immediately
+            }
+
+            // User Cancels trip manually
+            cancelTrip() {
+                this.isArmed = false;
+                this.stopTravelTimer();
+                document.getElementById('timer-display').textContent = "--:--";
+                document.getElementById('timer-display').style.color = "var(--dark)";
+                this.showStatus('Trip Cancelled', 'info');
+                this.updateUI();
+            }
+
             checkGeofences() {
                 if (!this.currentPosition || this.geofences.length === 0) return;
 
                 let insideAnyZone = false;
                 let currentZoneName = "Transit (Unknown)";
 
-                // Check if user is inside ANY saved geofence
+                // Find out if we are inside any saved zone right now
                 for (const g of this.geofences) {
                     const dist = this.getDistance(this.currentPosition.lat, this.currentPosition.lng, g.lat, g.lng);
                     if (dist <= g.radius) {
@@ -444,17 +468,16 @@
                     }
                 }
 
-                // CASE 1: Left ALL safe zones -> Trip Starts
-                if (!insideAnyZone && !this.tripStarted) {
-                    this.tripStarted = true;
+                // CASE 1: System is ARMED, and user steps OUTSIDE a safe zone -> START TRIP TIMER
+                if (this.isArmed && !insideAnyZone && !this.timerInterval) {
                     this.startTravelTimer();
                     this.sendTelegramMessage(`🚀 *Trip Started*\nLeft safe zone. Expected arrival in ${this.settings.travelTimer / 60000} mins.`);
                     this.showStatus('Trip Started! Timer Active', 'warning');
                 }
 
-                // CASE 2: Entered ANY safe zone -> Trip Stops (Safe Arrival)
-                if (insideAnyZone && this.tripStarted) {
-                    this.tripStarted = false;
+                // CASE 2: Timer is running (Trip Active), and user ENTERS a safe zone -> END TRIP
+                if (this.timerInterval && insideAnyZone) {
+                    this.isArmed = false; // Disarm the system
                     this.stopTravelTimer();
                     document.getElementById('timer-display').textContent = "00:00 ✅";
                     document.getElementById('timer-display').style.color = "var(--success)";
@@ -463,6 +486,7 @@
                 }
 
                 document.getElementById('status-mode').textContent = `📍 ${currentZoneName}`;
+                this.updateUI(); // Keep UI in sync
             }
 
             startTravelTimer() {
@@ -484,6 +508,7 @@
                         this.triggerSOS('Timer Expired: Did not reach destination in time!');
                     }
                 }, 1000);
+                this.updateUI();
             }
 
             stopTravelTimer() {
@@ -491,9 +516,42 @@
                     clearInterval(this.timerInterval);
                     this.timerInterval = null;
                 }
+                this.updateUI();
             }
 
-            // Centralized Telegram Messenger
+            // Update UI based on Current State
+            updateUI() {
+                const statusDiv = document.getElementById('current-status');
+                
+                if (!this.isArmed && !this.timerInterval) {
+                    // IDLE STATE
+                    statusDiv.innerHTML = `
+                        <button class="btn btn-success" onclick="tracker.manualStart()" style="font-size:1.1rem; padding:1rem;">🚀 Start My Trip</button>
+                        <p style="font-size: 0.85rem; margin-top: 10px; opacity: 0.8;">Tap before leaving a safe zone to arm Rakshak.</p>
+                    `;
+                } else if (this.isArmed && !this.timerInterval) {
+                    // ARMED, WAITING TO LEAVE
+                    statusDiv.innerHTML = `
+                        <span style="color:var(--primary); font-weight:bold; font-size:1.1rem;">🛡️ Armed: Waiting to leave safe zone...</span>
+                        <br><br>
+                        <button class="btn btn-warning" onclick="tracker.cancelTrip()">Cancel Trip</button>
+                    `;
+                } else if (this.timerInterval) {
+                    // IN TRANSIT (TIMER RUNNING)
+                    statusDiv.innerHTML = `
+                        <div style="background: rgba(255,193,7,0.2); padding: 1rem; border-radius: 12px; border: 1px solid var(--warning);">
+                            <span style="color:var(--warning); font-weight:bold; font-size:1.1rem;">🔄 Trip in Progress...</span>
+                            <div style="font-size: 0.9rem; margin-top:10px;">
+                                <strong>Live GPS:</strong><br>
+                                Lat: ${this.currentPosition ? this.currentPosition.lat.toFixed(5) : 'Wait'}, Lng: ${this.currentPosition ? this.currentPosition.lng.toFixed(5) : 'Wait'}
+                            </div>
+                        </div>
+                        <br>
+                        <button class="btn btn-danger" onclick="tracker.cancelTrip()">Force Stop Trip</button>
+                    `;
+                }
+            }
+
             async sendTelegramMessage(msgText) {
                 if (!this.settings.telegramToken || !this.settings.telegramChatId) return;
                 try {
@@ -536,7 +594,7 @@
 
                 let msg = `🚨 *EMERGENCY SOS TRIGGERED* 🚨\n\n*Reason:* ${reason}\n*Time:* ${timestamp}\n*Battery:* ${batteryEl}\n`;
                 if (lat !== 'Unknown') {
-                    msg += `*Location:* https://www.google.com/maps?q=$${lat},${lon}\n\n_Live tracking activated._`;
+                    msg += `*Location:* http://googleusercontent.com/maps.google.com/maps?q=${lat},${lon}\n\n_Live tracking activated._`;
                 } else {
                     msg += `*Location:* GPS unavailable.`;
                 }
@@ -578,28 +636,19 @@
             loadData() {
                 const savedGeofences = localStorage.getItem('safety_geofences');
                 if (savedGeofences) this.geofences = JSON.parse(savedGeofences);
+                
                 const savedSettings = localStorage.getItem('safety_settings');
-                if (savedSettings) this.settings = { ...this.settings, ...JSON.parse(savedSettings) };
+                if (savedSettings) {
+                    this.settings = { ...this.settings, ...JSON.parse(savedSettings) };
+                } else {
+                    // Fix for default timer issue: Ensure it pulls exactly what is in the dropdown if no save exists
+                    this.settings.travelTimer = parseInt(document.getElementById('travel-timer').value) * 60 * 1000;
+                }
 
                 document.getElementById('telegram-token').value = this.settings.telegramToken || '';
                 document.getElementById('telegram-chatid').value = this.settings.telegramChatId || '';
                 document.getElementById('travel-timer').value = (this.settings.travelTimer / 60000).toString();
                 this.renderGeofenceList();
-            }
-
-            updateUI() {
-                const statusDiv = document.getElementById('current-status');
-                if (this.isTracking) {
-                    statusDiv.innerHTML = `
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                            <span style="color: var(--success); font-weight: bold;">✅ Auto-Tracking Active</span>
-                        </div>
-                        <div style="font-size: 0.9rem; opacity: 0.8;">
-                            <strong>Live GPS:</strong><br>
-                            ${this.currentPosition ? `Lat: ${this.currentPosition.lat.toFixed(5)}, Lng: ${this.currentPosition.lng.toFixed(5)}<br>Accuracy: ±${Math.round(this.currentPosition.accuracy)}m` : 'Acquiring satellite lock...'}
-                        </div>
-                    `;
-                }
             }
 
             showLoading(text) { document.getElementById('loading-text').textContent = text; document.getElementById('loading').style.display = 'block'; }
