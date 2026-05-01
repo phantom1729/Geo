@@ -122,8 +122,7 @@
             <div id="dashboard" class="tab-content active">
                 <div class="map-container"><div id="map"></div></div>
                 <div class="card" id="current-status" style="text-align:center;">
-                    <p style="color: #64748b; font-weight: 500;">Establishing Satellite Lock...</p>
-                </div>
+                    </div>
             </div>
 
             <div id="geofences" class="tab-content">
@@ -157,7 +156,6 @@
         </main>
 
         <div class="sos-container"><button class="sos-button" onclick="triggerSOS()">SOS</button></div>
-
         <div id="status-message"></div>
     </div>
 
@@ -170,7 +168,6 @@
                 this.currentPos = null; this.selectedLoc = null;
                 this.settings = { telegramToken: '', telegramChatId: '', travelTimer: 10 * 60 * 1000 };
                 
-                // Voice Engine setup
                 this.synth = window.speechSynthesis;
                 
                 this.init();
@@ -180,11 +177,11 @@
                 this.loadData();
                 this.initMap();
                 this.initSensors();
+                this.updateUI(); // FIX: Call UI update instantly so button is always visible
                 this.startGPS();
                 this.simulateBandBPM();
             }
 
-            // --- Voice Engine ---
             speakText(text) {
                 if (this.synth.speaking) this.synth.cancel();
                 let utterance = new SpeechSynthesisUtterance(text);
@@ -192,7 +189,6 @@
                 this.synth.speak(utterance);
             }
 
-            // --- Band Simulation ---
             simulateBandBPM() {
                 setInterval(() => {
                     if(this.isSOSActive) {
@@ -218,7 +214,6 @@
             }
 
             initSensors() {
-                // Battery
                 if(navigator.getBattery) {
                     navigator.getBattery().then(b => {
                         let updateBat = () => {
@@ -230,8 +225,6 @@
                         updateBat(); b.addEventListener('levelchange', updateBat);
                     });
                 }
-                
-                // Shake Detection (Hardware Sensor)
                 if (window.DeviceMotionEvent) {
                     let lastTime = 0;
                     window.addEventListener('devicemotion', (e) => {
@@ -258,19 +251,15 @@
                         this.map.panTo([p.coords.latitude, p.coords.longitude]);
                         document.getElementById('status-tracking').innerText = '🔄 Locked';
                         this.checkSmartLogic();
+                        this.updateUI(); // FIX: Update UI securely on every GPS ping
                     },
                     (e) => { document.getElementById('status-tracking').innerText = '⚠️ Signal Lost'; },
                     { enableHighAccuracy: true, maximumAge: 5000 }
                 );
             }
 
-            // ==========================================
-            // THE IRON-CLAD ANTI-LOOP LOGIC
-            // ==========================================
             checkSmartLogic() {
-                if(!this.currentPos || this.geofences.length === 0) return;
-                
-                // 1. SOS State overrides everything. Don't run transit logic if SOS is active.
+                if(!this.currentPos) return; // Keep running even if geofences are empty so UI updates
                 if(this.isSOSActive) return;
 
                 let isInside = false;
@@ -282,14 +271,12 @@
                     }
                 }
                 
-                // Case A: Armed, outside zone, and timer not running -> Start Trip
                 if(this.isArmed && !isInside && !this.timerInterval) {
                     this.startTripTimer();
                     this.sendMsg(`🚀 *Trip Started*\nLeft safe zone. Expected arrival in ${this.settings.travelTimer / 60000} mins.`);
                     this.speakText("Trip Started. Monitoring your safety.");
                 }
 
-                // Case B: Trip Active, and entered a safe zone -> Stop Trip Safely
                 if(this.timerInterval && isInside) {
                     this.isArmed = false;
                     this.killTimer();
@@ -297,14 +284,13 @@
                     document.getElementById('timer-display').innerText = "SAFE ✅";
                     document.getElementById('timer-display').style.color = "var(--success)";
                     this.speakText(`Arrived safely at ${currentZone}.`);
-                    this.updateUI();
                 }
                 
                 document.getElementById('status-mode').innerText = currentZone;
             }
 
             startTripTimer() {
-                this.killTimer(); // Double check clean slate
+                this.killTimer(); 
                 let timeLeft = this.settings.travelTimer;
                 
                 this.timerInterval = setInterval(() => {
@@ -313,9 +299,8 @@
                     document.getElementById('timer-display').innerText = `${m}:${s < 10 ? '0'+s : s} ⏰`;
                     document.getElementById('timer-display').style.color = "var(--warning)";
                     
-                    // TIME EXPIRED EVENT
                     if(timeLeft <= 0) {
-                        this.killTimer(); // THIS LINE KILLS THE LOOP PERMANENTLY
+                        this.killTimer(); 
                         this.triggerSOS("Travel Timer Expired");
                     }
                 }, 1000);
@@ -329,25 +314,20 @@
                 }
             }
 
-            // ==========================================
-            // SOS ENGINE
-            // ==========================================
             async triggerSOS(reason = "Manual Emergency") {
-                if(this.isSOSActive) return; // Prevent double trigger
+                if(this.isSOSActive) return; 
                 
                 this.isSOSActive = true;
-                this.isArmed = false; // System disarms
-                this.killTimer(); // Ensure timer is absolutely dead
+                this.isArmed = false; 
+                this.killTimer(); 
                 
                 this.speakText("Alert! SOS Activated. Sending live location to emergency contacts.");
                 this.showStatus("🚨 SOS BROADCAST ACTIVE", "danger");
                 document.getElementById('timer-display').innerText = "SOS 🚨";
                 document.getElementById('timer-display').style.color = "var(--danger)";
                 
-                // Immediate initial broadcast
                 await this.sendSOSPayload(reason);
                 
-                // Live location loop every 15 seconds
                 this.sosInterval = setInterval(() => {
                     this.sendSOSPayload("Live Location Update");
                 }, 15000);
@@ -375,9 +355,6 @@
                 } catch(e) { console.error("Network fail"); }
             }
 
-            // ==========================================
-            // UTILITIES & UI
-            // ==========================================
             getDistance(l1, n1, l2, n2) {
                 let R = 6371000, dL = (l2-l1)*Math.PI/180, dN = (n2-n1)*Math.PI/180;
                 let a = Math.sin(dL/2)**2 + Math.cos(l1*Math.PI/180)*Math.cos(l2*Math.PI/180)*Math.sin(dN/2)**2;
@@ -406,7 +383,7 @@
                     `;
                 } else {
                     div.innerHTML = `
-                        <button class="btn btn-success" style="font-size: 1.2rem; padding: 1.2rem; box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.4);" onclick="app.armSystem()">🛡️ Start Protection Trip</button>
+                        <button class="btn btn-success" style="font-size: 1.2rem; padding: 1.2rem; box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.4);" onclick="app.armSystem()">🚀 Start Travelling</button>
                         <p style="font-size:0.8rem; margin-top:10px; color:#94a3b8;">Click before leaving a safe zone.</p>
                     `;
                 }
@@ -440,7 +417,6 @@
                 this.updateUI();
             }
 
-            // Storage functions
             saveGeofence() {
                 let n = document.getElementById('geofence-name').value, r = parseInt(document.getElementById('geofence-radius').value);
                 if(!n || !this.selectedLoc) { this.showStatus("Select location on map first", "warning"); return; }
@@ -496,7 +472,6 @@
         function triggerSOS() { app.triggerSOS("Manual Button Override"); }
         function testTelegram() { app.sendMsg("✅ *Rakshak Core* test successful. Connection solid."); app.showStatus("Test Sent", "success"); }
 
-        // Tab Switcher Logic
         document.querySelectorAll('.nav-tab').forEach(t => {
             t.addEventListener('click', () => {
                 document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
