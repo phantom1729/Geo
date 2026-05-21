@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rakshak Elite - Safety Ecosystem</title>
+    <title>Rakshak Elite - Autonomous Safety</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
     
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
@@ -18,64 +19,53 @@
         body { background: #e2e8f0; min-height: 100vh; overflow-x: hidden; color: var(--text-dark); }
         .app-container { max-width: 100%; margin: 0 auto; min-height: 100vh; position: relative; background: #f1f5f9; }
         
-        /* Premium Header */
         .header { background: var(--primary); color: var(--text-light); padding: 1.2rem 1rem; position: sticky; top: 0; z-index: 1000; box-shadow: var(--shadow); border-bottom: 3px solid var(--accent); }
         .header h1 { font-size: 1.6rem; font-weight: 800; text-align: center; margin-bottom: 1rem; letter-spacing: 1px; display: flex; align-items: center; justify-content: center; gap: 8px; }
         .status-bar { display: flex; justify-content: space-between; font-size: 0.8rem; background: var(--primary-light); padding: 10px; border-radius: 12px; }
         .status-item { display: flex; flex-direction: column; align-items: center; gap: 4px; font-weight: 600; }
         
-        /* Battery & Timer */
         .battery-fill { width: 32px; height: 14px; background: rgba(255,255,255,0.2); border-radius: 3px; position: relative; border: 1px solid rgba(255,255,255,0.5); }
-        .battery-fill::after { content: ''; position: absolute; right: -4px; top: 3px; width: 3px; height: 6px; background: rgba(255,255,255,0.5); border-radius: 1px; }
         .battery-level { height: 100%; background: var(--success); transition: width 0.3s ease; }
         #timer-display { font-size: 1.1rem; font-weight: bold; color: var(--warning); }
-        
-        /* Smart Band Panel (New Feature) */
-        .band-panel { background: linear-gradient(135deg, #1e293b, #0f172a); color: white; margin: 1rem; padding: 1rem; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; box-shadow: var(--shadow); border-left: 4px solid var(--success); }
-        .band-info { display: flex; flex-direction: column; }
-        .heart-rate { font-size: 1.5rem; font-weight: 800; color: #fb7185; display: flex; align-items: center; gap: 5px; }
-        .pulse-anim { animation: heartbeat 1.5s infinite; }
-        @keyframes heartbeat { 0% { transform: scale(1); } 50% { transform: scale(1.15); } 100% { transform: scale(1); } }
 
-        /* Main Content */
         .main-content { padding: 0.5rem 1rem 6rem 1rem; }
         .tab-content { display: none; animation: fadeIn 0.3s ease; }
         .tab-content.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         
-        /* Cards & Map */
-        .map-container { height: 350px; border-radius: 16px; overflow: hidden; box-shadow: var(--shadow); margin-bottom: 1rem; border: 2px solid white; }
+        .map-container { height: 350px; border-radius: 16px; overflow: hidden; box-shadow: var(--shadow); margin-bottom: 1rem; border: 2px solid white; position: relative; }
         #map { height: 100%; width: 100%; z-index: 1; }
         .card { background: white; border-radius: 16px; padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
         .card h3 { color: var(--primary); margin-bottom: 1rem; display: flex; align-items: center; gap: 8px; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px; }
         
-        /* Navigation Tabs */
         .nav-tabs { display: flex; background: white; border-radius: 12px; margin-bottom: 1rem; padding: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         .nav-tab { flex: 1; padding: 0.8rem; border: none; font-weight: bold; cursor: pointer; background: transparent; color: #64748b; border-radius: 8px; transition: all 0.3s; }
         .nav-tab.active { background: var(--accent); color: white; box-shadow: 0 2px 10px rgba(59, 130, 246, 0.4); }
 
-        /* Forms & Buttons */
         .form-group { margin-bottom: 1.2rem; }
         .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; font-size: 0.9rem; color: #475569; }
-        .form-group input, .form-group select { width: 100%; padding: 0.8rem; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 1rem; outline: none; transition: border 0.3s; }
+        .form-group input { width: 100%; padding: 0.8rem; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 1rem; outline: none; transition: border 0.3s; }
         .form-group input:focus { border-color: var(--accent); }
+        
+        .timer-inputs { display: flex; gap: 10px; }
+        
         .btn { background: var(--primary); color: white; border: none; padding: 1rem; border-radius: 12px; font-weight: bold; font-size: 1rem; cursor: pointer; width: 100%; margin-top: 0.5rem; transition: transform 0.2s, background 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .btn:active { transform: scale(0.98); }
         .btn-success { background: var(--success); }
         .btn-danger { background: var(--danger); }
+        .btn-route { background: #8b5cf6; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4); }
         
-        /* SOS Button Elite */
         .sos-container { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); z-index: 2000; }
         .sos-button { background: linear-gradient(135deg, #ef4444, #b91c1c); color: white; border: 4px solid rgba(255,255,255,0.3); width: 85px; height: 85px; border-radius: 50%; font-size: 1.3rem; font-weight: 900; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 25px rgba(239, 68, 68, 0.6); animation: pulseSOS 2s infinite; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
         @keyframes pulseSOS { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
         
-        /* Safe Zones List */
         .geofence-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
         .geofence-item { background: #f8fafc; border: 2px solid #e2e8f0; color: var(--text-dark); padding: 1rem; border-radius: 12px; text-align: center; cursor: pointer; font-weight: bold; transition: all 0.2s; }
-        .geofence-item:hover { border-color: var(--accent); background: #eff6ff; }
-
-        /* Notifications */
+        
         #status-message { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 1rem 1.5rem; border-radius: 30px; color: white; font-weight: bold; display: none; z-index: 4000; box-shadow: var(--shadow); white-space: nowrap; }
+        
+        /* Hide default routing text box to keep UI clean on mobile */
+        .leaflet-routing-container { display: none !important; }
     </style>
 </head>
 <body>
@@ -92,7 +82,7 @@
                     <small id="battery-text" style="color:#cbd5e1">--%</small>
                 </div>
                 <div class="status-item">
-                    <span id="status-mode">📍 Transit</span>
+                    <span id="status-mode">📍 Loading</span>
                     <small style="color:#cbd5e1">Zone</small>
                 </div>
                 <div class="status-item">
@@ -101,16 +91,6 @@
                 </div>
             </div>
         </header>
-
-        <div class="band-panel">
-            <div class="band-info">
-                <span style="font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; font-weight: bold;">Rakshak Band Sync</span>
-                <span style="font-weight: 600; font-size: 0.9rem;">ESP32-C3 <span style="color:var(--success)">● Connected</span></span>
-            </div>
-            <div class="heart-rate pulse-anim">
-                ❤️ <span id="mock-bpm">72</span> <span style="font-size: 0.8rem; color: white; font-weight: normal;">BPM</span>
-            </div>
-        </div>
 
         <main class="main-content">
             <div class="nav-tabs">
@@ -121,8 +101,7 @@
 
             <div id="dashboard" class="tab-content active">
                 <div class="map-container"><div id="map"></div></div>
-                <div class="card" id="current-status" style="text-align:center;">
-                    </div>
+                <div class="card" id="current-status" style="text-align:center;"></div>
             </div>
 
             <div id="geofences" class="tab-content">
@@ -139,18 +118,24 @@
             <div id="settings" class="tab-content">
                 <div class="card">
                     <h3>⚙️ Core Settings</h3>
-                    <div class="form-group"><label>Telegram Bot Token</label><input type="password" id="telegram-token" placeholder="bot12345:ABCDEF..."></div>
-                    <div class="form-group"><label>Emergency Chat ID</label><input type="text" id="telegram-chatid" placeholder="123456789"></div>
                     <div class="form-group">
-                        <label>Default Travel Time Limit</label>
-                        <select id="travel-timer">
-                            <option value="5">5 Minutes</option><option value="10" selected>10 Minutes</option>
-                            <option value="15">15 Minutes</option><option value="20">20 Minutes</option>
-                            <option value="30">30 Minutes</option>
-                        </select>
+                        <label>Telegram Bot Token (Split for Security)</label>
+                        <div class="timer-inputs">
+                            <input type="password" id="tele-token-1" placeholder="bot123456789">
+                            <input type="password" id="tele-token-2" placeholder=":ABCDefgh123...">
+                        </div>
                     </div>
+                    <div class="form-group"><label>Emergency Chat ID</label><input type="text" id="telegram-chatid" placeholder="123456789"></div>
+                    
+                    <div class="form-group">
+                        <label>Custom Travel Timer Limits</label>
+                        <div class="timer-inputs">
+                            <input type="number" id="timer-min" min="0" max="100" placeholder="Minutes (0-100)" value="10">
+                            <input type="number" id="timer-sec" min="0" max="59" step="30" placeholder="Seconds (0 or 30)" value="0">
+                        </div>
+                    </div>
+                    
                     <button class="btn btn-success" onclick="saveSettings()">Apply Settings</button>
-                    <button class="btn" onclick="testTelegram()" style="background:#475569;">Test Network</button>
                 </div>
             </div>
         </main>
@@ -160,16 +145,21 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
     <script>
         class RakshakElite {
             constructor() {
-                this.map = null; this.geofences = []; this.isArmed = false;
-                this.timerInterval = null; this.sosInterval = null; this.isSOSActive = false;
-                this.currentPos = null; this.selectedLoc = null;
-                this.settings = { telegramToken: '', telegramChatId: '', travelTimer: 10 * 60 * 1000 };
+                this.map = null; 
+                this.geofences = []; 
+                this.timerInterval = null; 
+                this.sosInterval = null; 
+                this.isSOSActive = false;
+                this.currentPos = null; 
+                this.selectedLoc = null;
+                this.routingControl = null; // New variable for routing
+                this.settings = { teleToken1: '', teleToken2: '', telegramChatId: '', travelTimerMS: 600000 };
                 
                 this.synth = window.speechSynthesis;
-                
                 this.init();
             }
 
@@ -177,9 +167,8 @@
                 this.loadData();
                 this.initMap();
                 this.initSensors();
-                this.updateUI(); // FIX: Call UI update instantly so button is always visible
+                this.updateUI(); 
                 this.startGPS();
-                this.simulateBandBPM();
             }
 
             speakText(text) {
@@ -187,18 +176,6 @@
                 let utterance = new SpeechSynthesisUtterance(text);
                 utterance.rate = 1.0; utterance.pitch = 1.0;
                 this.synth.speak(utterance);
-            }
-
-            simulateBandBPM() {
-                setInterval(() => {
-                    if(this.isSOSActive) {
-                        document.getElementById('mock-bpm').innerText = Math.floor(Math.random() * (130 - 115 + 1) + 115);
-                    } else if (this.timerInterval) {
-                        document.getElementById('mock-bpm').innerText = Math.floor(Math.random() * (95 - 85 + 1) + 85);
-                    } else {
-                        document.getElementById('mock-bpm').innerText = Math.floor(Math.random() * (75 - 65 + 1) + 65);
-                    }
-                }, 2000);
             }
 
             initMap() {
@@ -251,7 +228,7 @@
                         this.map.panTo([p.coords.latitude, p.coords.longitude]);
                         document.getElementById('status-tracking').innerText = '🔄 Locked';
                         this.checkSmartLogic();
-                        this.updateUI(); // FIX: Update UI securely on every GPS ping
+                        this.updateUI(); 
                     },
                     (e) => { document.getElementById('status-tracking').innerText = '⚠️ Signal Lost'; },
                     { enableHighAccuracy: true, maximumAge: 5000 }
@@ -259,7 +236,7 @@
             }
 
             checkSmartLogic() {
-                if(!this.currentPos) return; // Keep running even if geofences are empty so UI updates
+                if(!this.currentPos) return; 
                 if(this.isSOSActive) return;
 
                 let isInside = false;
@@ -271,16 +248,19 @@
                     }
                 }
                 
-                if(this.isArmed && !isInside && !this.timerInterval) {
+                if(!isInside && !this.timerInterval) {
                     this.startTripTimer();
-                    this.sendMsg(`🚀 *Trip Started*\nLeft safe zone. Expected arrival in ${this.settings.travelTimer / 60000} mins.`);
-                    this.speakText("Trip Started. Monitoring your safety.");
+                    this.sendMsg(`🚀 *Autonomous Alert*\nUser is outside safe zones. Transit timer started.`);
+                    this.speakText("You are outside a safe zone. Protection timer activated.");
                 }
 
                 if(this.timerInterval && isInside) {
-                    this.isArmed = false;
                     this.killTimer();
-                    this.sendMsg(`✅ *Reached Safely*\nArrived at ${currentZone}. Monitoring paused.`);
+                    if(this.routingControl) {
+                        this.map.removeControl(this.routingControl);
+                        this.routingControl = null;
+                    }
+                    this.sendMsg(`✅ *Reached Safely*\nArrived at ${currentZone}. System standing by.`);
                     document.getElementById('timer-display').innerText = "SAFE ✅";
                     document.getElementById('timer-display').style.color = "var(--success)";
                     this.speakText(`Arrived safely at ${currentZone}.`);
@@ -289,9 +269,47 @@
                 document.getElementById('status-mode').innerText = currentZone;
             }
 
+            // --- NEW ROUTING FEATURE ---
+            findBestRoute() {
+                if(!this.currentPos || this.geofences.length === 0) {
+                    this.showStatus("No Safe Zones saved or GPS unavailable.", "warning");
+                    return;
+                }
+
+                let nearestZone = null;
+                let minDistance = Infinity;
+
+                // Find the closest geofence
+                this.geofences.forEach(g => {
+                    let d = this.getDistance(this.currentPos.lat, this.currentPos.lng, g.lat, g.lng);
+                    if(d < minDistance) {
+                        minDistance = d;
+                        nearestZone = g;
+                    }
+                });
+
+                if(nearestZone) {
+                    if(this.routingControl) this.map.removeControl(this.routingControl);
+                    
+                    this.routingControl = L.Routing.control({
+                        waypoints: [
+                            L.latLng(this.currentPos.lat, this.currentPos.lng),
+                            L.latLng(nearestZone.lat, nearestZone.lng)
+                        ],
+                        routeWhileDragging: false,
+                        addWaypoints: false,
+                        fitSelectedRoutes: true,
+                        show: false // Hides the bulky text directions
+                    }).addTo(this.map);
+
+                    this.speakText(`Calculating best route to ${nearestZone.name}.`);
+                    this.showStatus(`Routing to ${nearestZone.name}`, "success");
+                }
+            }
+
             startTripTimer() {
                 this.killTimer(); 
-                let timeLeft = this.settings.travelTimer;
+                let timeLeft = this.settings.travelTimerMS; 
                 
                 this.timerInterval = setInterval(() => {
                     timeLeft -= 1000;
@@ -301,7 +319,7 @@
                     
                     if(timeLeft <= 0) {
                         this.killTimer(); 
-                        this.triggerSOS("Travel Timer Expired");
+                        this.triggerSOS("Travel Timer Expired (Did not reach safe zone)");
                     }
                 }, 1000);
                 this.updateUI();
@@ -316,38 +334,36 @@
 
             async triggerSOS(reason = "Manual Emergency") {
                 if(this.isSOSActive) return; 
-                
                 this.isSOSActive = true;
-                this.isArmed = false; 
                 this.killTimer(); 
                 
-                this.speakText("Alert! SOS Activated. Sending live location to emergency contacts.");
+                if(this.routingControl) {
+                    this.map.removeControl(this.routingControl);
+                    this.routingControl = null;
+                }
+                
+                this.speakText("Alert! SOS Activated. Sending live location.");
                 this.showStatus("🚨 SOS BROADCAST ACTIVE", "danger");
                 document.getElementById('timer-display').innerText = "SOS 🚨";
                 document.getElementById('timer-display').style.color = "var(--danger)";
                 
                 await this.sendSOSPayload(reason);
-                
-                this.sosInterval = setInterval(() => {
-                    this.sendSOSPayload("Live Location Update");
-                }, 15000);
-                
+                this.sosInterval = setInterval(() => { this.sendSOSPayload("Live Location Update"); }, 15000);
                 this.updateUI();
             }
 
             async sendSOSPayload(reason) {
                 let bat = document.getElementById('battery-text').innerText;
-                let loc = this.currentPos ? `http://maps.google.com/?q=${this.currentPos.lat},${this.currentPos.lng}` : "GPS Unavailable";
-                let bpm = document.getElementById('mock-bpm').innerText;
-                
-                let msg = `🚨 *EMERGENCY SOS* 🚨\n\n*Reason:* ${reason}\n*Vitals (Band):* ${bpm} BPM\n*Battery:* ${bat}\n*Location:* ${loc}\n\n_System tracking locked._`;
+                let loc = this.currentPos ? `http://maps.google.com/maps?q=${this.currentPos.lat},${this.currentPos.lng}` : "GPS Unavailable";
+                let msg = `🚨 *EMERGENCY SOS* 🚨\n\n*Reason:* ${reason}\n*Battery:* ${bat}\n*Live Location:* ${loc}\n\n_System tracking locked._`;
                 await this.sendMsg(msg);
             }
 
             async sendMsg(txt) {
-                if(!this.settings.telegramToken || !this.settings.telegramChatId) return;
+                let fullToken = this.settings.teleToken1 + this.settings.teleToken2;
+                if(!fullToken || !this.settings.telegramChatId) return;
                 try {
-                    await fetch(`https://api.telegram.org/bot${this.settings.telegramToken}/sendMessage`, {
+                    await fetch(`https://api.telegram.org/bot${fullToken}/sendMessage`, {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({chat_id: this.settings.telegramChatId, text: txt, parse_mode: 'Markdown'})
@@ -366,55 +382,33 @@
                 if(this.isSOSActive) {
                     div.innerHTML = `
                         <h2 style="color:var(--danger); margin-bottom:10px;">🚨 SOS ACTIVE</h2>
-                        <p style="font-size:0.9rem; color:#64748b; margin-bottom:15px;">Broadcasting live location to Telegram.</p>
+                        <p style="font-size:0.9rem; color:#64748b; margin-bottom:15px;">Broadcasting live location to Telegram every 15 seconds.</p>
                         <button class="btn" style="background:#0f172a; border:2px solid var(--danger);" onclick="app.cancelSOS()">🛑 Secure Deactivate SOS</button>
                     `;
                 } else if(this.timerInterval) {
                     div.innerHTML = `
-                        <h3 style="color:var(--warning);">🔄 Trip Monitoring Active</h3>
-                        <p style="font-size:0.9rem; margin:10px 0;">Rakshak is analyzing your transit.</p>
-                        <button class="btn btn-danger" onclick="app.disarmSystem()">Force Stop Trip</button>
-                    `;
-                } else if(this.isArmed) {
-                    div.innerHTML = `
-                        <h3 style="color:var(--accent);">🛡️ System Armed</h3>
-                        <p style="font-size:0.9rem; margin:10px 0;">Leave the safe zone to start the timer.</p>
-                        <button class="btn" style="background:#64748b;" onclick="app.disarmSystem()">Cancel Arming</button>
+                        <h3 style="color:var(--warning); margin-bottom:10px;">🔄 Transit Mode Active</h3>
+                        <p style="font-size:0.9rem; margin:10px 0;">You are outside a safe zone. Timer running automatically.</p>
+                        <button class="btn btn-route" onclick="app.findBestRoute()">🗺️ Get Route to Nearest Safe Zone</button>
                     `;
                 } else {
                     div.innerHTML = `
-                        <button class="btn btn-success" style="font-size: 1.2rem; padding: 1.2rem; box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.4);" onclick="app.armSystem()">🚀 Start Travelling</button>
-                        <p style="font-size:0.8rem; margin-top:10px; color:#94a3b8;">Click before leaving a safe zone.</p>
+                        <h3 style="color:var(--success);">✅ Safe Zone Secure</h3>
+                        <p style="font-size:0.9rem; margin:10px 0;">You are currently inside a designated protection zone.</p>
                     `;
                 }
             }
 
-            armSystem() {
-                this.isArmed = true; 
-                this.speakText("Rakshak system armed. Ready for transit.");
-                this.showStatus("System Armed", "success"); 
-                this.updateUI(); 
-                this.checkSmartLogic(); 
-            }
-
-            disarmSystem() {
-                this.isArmed = false; 
-                this.killTimer();
-                document.getElementById('timer-display').innerText = "--:--";
-                document.getElementById('timer-display').style.color = "var(--text-dark)";
-                this.speakText("Protection trip cancelled.");
-                this.updateUI(); 
-            }
-
             cancelSOS() {
                 this.isSOSActive = false;
-                if(this.sosInterval) clearInterval(this.sosInterval);
+                if(this.sosInterval) { clearInterval(this.sosInterval); this.sosInterval = null; }
                 this.speakText("SOS deactivated. System returning to standby.");
                 this.showStatus("SOS Secured", "success");
                 this.sendMsg("✅ *SOS Cancelled* by user. Situation secured.");
                 document.getElementById('timer-display').innerText = "--:--";
                 document.getElementById('timer-display').style.color = "var(--text-dark)";
                 this.updateUI();
+                this.checkSmartLogic();
             }
 
             saveGeofence() {
@@ -437,9 +431,12 @@
             }
 
             saveSettings() {
-                this.settings.telegramToken = document.getElementById('telegram-token').value;
+                this.settings.teleToken1 = document.getElementById('tele-token-1').value;
+                this.settings.teleToken2 = document.getElementById('tele-token-2').value;
                 this.settings.telegramChatId = document.getElementById('telegram-chatid').value;
-                this.settings.travelTimer = parseInt(document.getElementById('travel-timer').value) * 60000;
+                let mins = parseInt(document.getElementById('timer-min').value) || 0;
+                let secs = parseInt(document.getElementById('timer-sec').value) || 0;
+                this.settings.travelTimerMS = (mins * 60000) + (secs * 1000); 
                 this.saveData(); this.showStatus("Settings Synced", "success");
             }
 
@@ -453,9 +450,13 @@
                 if(g) this.geofences = JSON.parse(g);
                 if(s) {
                     this.settings = JSON.parse(s);
-                    document.getElementById('telegram-token').value = this.settings.telegramToken;
-                    document.getElementById('telegram-chatid').value = this.settings.telegramChatId;
-                    document.getElementById('travel-timer').value = this.settings.travelTimer / 60000;
+                    document.getElementById('tele-token-1').value = this.settings.teleToken1 || '';
+                    document.getElementById('tele-token-2').value = this.settings.teleToken2 || '';
+                    document.getElementById('telegram-chatid').value = this.settings.telegramChatId || '';
+                    if(this.settings.travelTimerMS) {
+                        document.getElementById('timer-min').value = Math.floor(this.settings.travelTimerMS / 60000);
+                        document.getElementById('timer-sec').value = Math.floor((this.settings.travelTimerMS % 60000) / 1000);
+                    }
                 }
             }
 
@@ -470,7 +471,6 @@
         function saveGeofence() { app.saveGeofence(); }
         function saveSettings() { app.saveSettings(); }
         function triggerSOS() { app.triggerSOS("Manual Button Override"); }
-        function testTelegram() { app.sendMsg("✅ *Rakshak Core* test successful. Connection solid."); app.showStatus("Test Sent", "success"); }
 
         document.querySelectorAll('.nav-tab').forEach(t => {
             t.addEventListener('click', () => {
