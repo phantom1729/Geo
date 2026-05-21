@@ -118,13 +118,7 @@
             <div id="settings" class="tab-content">
                 <div class="card">
                     <h3>⚙️ Core Settings</h3>
-                    <div class="form-group">
-                        <label>Telegram Bot Token (Split for Security)</label>
-                        <div class="timer-inputs">
-                            <input type="password" id="tele-token-1" placeholder="bot123456789">
-                            <input type="password" id="tele-token-2" placeholder=":ABCDefgh123...">
-                        </div>
-                    </div>
+                    
                     <div class="form-group"><label>Emergency Chat ID</label><input type="text" id="telegram-chatid" placeholder="123456789"></div>
                     
                     <div class="form-group">
@@ -149,6 +143,9 @@
     <script>
         class RakshakElite {
             constructor() {
+                // HARDCODED BOT TOKEN - Yahan apna actual token dalna. Kise k sath share mat karna code!
+                this.botToken = "PASTE_YOUR_BOT_TOKEN_HERE"; 
+                
                 this.map = null; 
                 this.geofences = []; 
                 this.timerInterval = null; 
@@ -156,8 +153,8 @@
                 this.isSOSActive = false;
                 this.currentPos = null; 
                 this.selectedLoc = null;
-                this.routingControl = null; // New variable for routing
-                this.settings = { teleToken1: '', teleToken2: '', telegramChatId: '', travelTimerMS: 600000 };
+                this.routingControl = null; 
+                this.settings = { telegramChatId: '', travelTimerMS: 600000 };
                 
                 this.synth = window.speechSynthesis;
                 this.init();
@@ -269,7 +266,6 @@
                 document.getElementById('status-mode').innerText = currentZone;
             }
 
-            // --- NEW ROUTING FEATURE ---
             findBestRoute() {
                 if(!this.currentPos || this.geofences.length === 0) {
                     this.showStatus("No Safe Zones saved or GPS unavailable.", "warning");
@@ -279,7 +275,6 @@
                 let nearestZone = null;
                 let minDistance = Infinity;
 
-                // Find the closest geofence
                 this.geofences.forEach(g => {
                     let d = this.getDistance(this.currentPos.lat, this.currentPos.lng, g.lat, g.lng);
                     if(d < minDistance) {
@@ -299,7 +294,7 @@
                         routeWhileDragging: false,
                         addWaypoints: false,
                         fitSelectedRoutes: true,
-                        show: false // Hides the bulky text directions
+                        show: false
                     }).addTo(this.map);
 
                     this.speakText(`Calculating best route to ${nearestZone.name}.`);
@@ -360,10 +355,12 @@
             }
 
             async sendMsg(txt) {
-                let fullToken = this.settings.teleToken1 + this.settings.teleToken2;
-                if(!fullToken || !this.settings.telegramChatId) return;
+                if(!this.botToken || this.botToken === "PASTE_YOUR_BOT_TOKEN_HERE" || !this.settings.telegramChatId) {
+                    console.error("Token ya Chat ID missing hai.");
+                    return;
+                }
                 try {
-                    await fetch(`https://api.telegram.org/bot${fullToken}/sendMessage`, {
+                    await fetch(`https://api.telegram.org/bot${this.botToken}/sendMessage`, {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({chat_id: this.settings.telegramChatId, text: txt, parse_mode: 'Markdown'})
@@ -431,8 +428,6 @@
             }
 
             saveSettings() {
-                this.settings.teleToken1 = document.getElementById('tele-token-1').value;
-                this.settings.teleToken2 = document.getElementById('tele-token-2').value;
                 this.settings.telegramChatId = document.getElementById('telegram-chatid').value;
                 let mins = parseInt(document.getElementById('timer-min').value) || 0;
                 let secs = parseInt(document.getElementById('timer-sec').value) || 0;
@@ -450,8 +445,6 @@
                 if(g) this.geofences = JSON.parse(g);
                 if(s) {
                     this.settings = JSON.parse(s);
-                    document.getElementById('tele-token-1').value = this.settings.teleToken1 || '';
-                    document.getElementById('tele-token-2').value = this.settings.teleToken2 || '';
                     document.getElementById('telegram-chatid').value = this.settings.telegramChatId || '';
                     if(this.settings.travelTimerMS) {
                         document.getElementById('timer-min').value = Math.floor(this.settings.travelTimerMS / 60000);
