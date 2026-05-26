@@ -15,6 +15,7 @@
             --success: #10b981; --danger: #ef4444; --warning: #f59e0b;
             --text-light: #f8fafc; --text-dark: #0f172a;
             --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            --route-color: #8b5cf6;
         }
         body { background: #e2e8f0; min-height: 100vh; overflow-x: hidden; color: var(--text-dark); }
         .app-container { max-width: 100%; margin: 0 auto; min-height: 100vh; position: relative; background: #f1f5f9; }
@@ -28,7 +29,7 @@
         .battery-level { height: 100%; background: var(--success); transition: width 0.3s ease; }
         #timer-display { font-size: 1.1rem; font-weight: bold; color: var(--warning); }
 
-        .main-content { padding: 0.5rem 1rem 6rem 1rem; }
+        .main-content { padding: 0.5rem 1rem 8rem 1rem; }
         .tab-content { display: none; animation: fadeIn 0.3s ease; }
         .tab-content.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -53,7 +54,7 @@
         .btn:active { transform: scale(0.98); }
         .btn-success { background: var(--success); }
         .btn-danger { background: var(--danger); }
-        .btn-route { background: #8b5cf6; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4); }
+        .btn-route { background: var(--route-color); box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4); }
         
         .sos-container { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); z-index: 2000; }
         .sos-button { background: linear-gradient(135deg, #ef4444, #b91c1c); color: white; border: 4px solid rgba(255,255,255,0.3); width: 85px; height: 85px; border-radius: 50%; font-size: 1.3rem; font-weight: 900; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 25px rgba(239, 68, 68, 0.6); animation: pulseSOS 2s infinite; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
@@ -64,14 +65,17 @@
         
         #status-message { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 1rem 1.5rem; border-radius: 30px; color: white; font-weight: bold; display: none; z-index: 4000; box-shadow: var(--shadow); white-space: nowrap; }
         
-        /* Hide default routing text box to keep UI clean on mobile */
         .leaflet-routing-container { display: none !important; }
+
+        /* Recording Indicator */
+        .recording-badge { display: none; background: rgba(239,68,68,0.2); border: 1px solid var(--danger); color: var(--danger); padding: 4px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; margin-left: 10px; animation: blink 1s infinite; }
+        @keyframes blink { 0% {opacity:1;} 50% {opacity:0.4;} 100% {opacity:1;} }
     </style>
 </head>
 <body>
     <div class="app-container">
         <header class="header">
-            <h1>🛡️ RAKSHAK ELITE</h1>
+            <h1>🛡️ RAKSHAK ELITE <span id="rec-badge" class="recording-badge">REC</span></h1>
             <div class="status-bar">
                 <div class="status-item">
                     <span id="status-tracking" style="color:var(--success)">⏹️ Init...</span>
@@ -95,7 +99,7 @@
         <main class="main-content">
             <div class="nav-tabs">
                 <button class="nav-tab active" data-tab="dashboard">Dashboard</button>
-                <button class="nav-tab" data-tab="geofences">Safe Zones</button>
+                <button class="nav-tab" data-tab="geofences">Zones & Routes</button>
                 <button class="nav-tab" data-tab="settings">Settings</button>
             </div>
 
@@ -106,7 +110,14 @@
 
             <div id="geofences" class="tab-content">
                 <div class="card">
-                    <h3>➕ Add Protection Zone</h3>
+                    <h3>🗺️ Route Deviation Protection</h3>
+                    <p style="font-size:0.85rem; color:#64748b; margin-bottom: 1rem;">Walk your regular path while recording to establish a Safe Route. Starying off this path triggers an alert.</p>
+                    <button id="btn-record" class="btn btn-route" onclick="toggleRouteRecording()">⏺️ Start Recording Safe Route</button>
+                    <button class="btn" style="background:#f1f5f9; color:var(--text-dark); border:1px solid #cbd5e1; margin-top:10px;" onclick="clearSafeRoute()">🗑️ Clear Saved Route</button>
+                </div>
+
+                <div class="card">
+                    <h3>➕ Add Safe Zone (Geofence)</h3>
                     <div class="form-group"><input type="text" id="geofence-name" placeholder="E.g., Home, Coaching"></div>
                     <p id="geofence-coords" style="font-size:0.85rem; color:var(--accent); font-weight:bold; margin-bottom:1rem; text-align: center; background:#eff6ff; padding:10px; border-radius:8px;">Tap Map to Set Target</p>
                     <div class="form-group"><label>Coverage Radius (Meters)</label><input type="number" id="geofence-radius" value="50"></div>
@@ -122,10 +133,16 @@
                     <div class="form-group"><label>Emergency Chat ID</label><input type="text" id="telegram-chatid" placeholder="123456789"></div>
                     
                     <div class="form-group">
+                        <label>Allowed Route Deviation (Meters)</label>
+                        <input type="number" id="deviation-limit" min="10" max="1000" placeholder="150" value="150">
+                        <small style="color:#64748b;">Distance allowed off the safe route before SOS triggers.</small>
+                    </div>
+
+                    <div class="form-group">
                         <label>Custom Travel Timer Limits</label>
                         <div class="timer-inputs">
-                            <input type="number" id="timer-min" min="0" max="100" placeholder="Minutes (0-100)" value="10">
-                            <input type="number" id="timer-sec" min="0" max="59" step="30" placeholder="Seconds (0 or 30)" value="0">
+                            <input type="number" id="timer-min" min="0" max="100" placeholder="Min" value="10">
+                            <input type="number" id="timer-sec" min="0" max="59" step="30" placeholder="Sec" value="0">
                         </div>
                     </div>
                     
@@ -143,18 +160,24 @@
     <script>
         class RakshakElite {
             constructor() {
-                // HARDCODED BOT TOKEN - Yahan apna actual token dalna. Kise k sath share mat karna code!
+                // HARDCODED BOT TOKEN - Do not share this openly.
                 this.botToken = "PASTE_YOUR_BOT_TOKEN_HERE"; 
                 
                 this.map = null; 
                 this.geofences = []; 
+                this.safeRoute = []; // Array of {lat, lng} for deviation logic
+                
                 this.timerInterval = null; 
                 this.sosInterval = null; 
                 this.isSOSActive = false;
+                this.isRecordingRoute = false;
+                
                 this.currentPos = null; 
                 this.selectedLoc = null;
                 this.routingControl = null; 
-                this.settings = { telegramChatId: '', travelTimerMS: 600000 };
+                this.routeLine = null; // Leaflet Polyline object
+                
+                this.settings = { telegramChatId: '', travelTimerMS: 600000, deviationLimit: 150 };
                 
                 this.synth = window.speechSynthesis;
                 this.init();
@@ -185,6 +208,7 @@
                     this.selectionMarker = L.marker(e.latlng).addTo(this.map);
                 });
                 this.renderGeofences();
+                this.drawSafeRoute();
             }
 
             initSensors() {
@@ -217,6 +241,8 @@
                 navigator.geolocation.watchPosition(
                     (p) => {
                         this.currentPos = { lat: p.coords.latitude, lng: p.coords.longitude };
+                        
+                        // Handle Map Marker
                         if(!this.userMarker) {
                             this.userMarker = L.circleMarker([p.coords.latitude, p.coords.longitude], {color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.5, radius: 10}).addTo(this.map);
                         } else {
@@ -224,6 +250,13 @@
                         }
                         this.map.panTo([p.coords.latitude, p.coords.longitude]);
                         document.getElementById('status-tracking').innerText = '🔄 Locked';
+                        
+                        // If recording, build the breadcrumb route
+                        if (this.isRecordingRoute) {
+                            this.safeRoute.push(this.currentPos);
+                            this.drawSafeRoute();
+                        }
+
                         this.checkSmartLogic();
                         this.updateUI(); 
                     },
@@ -232,26 +265,54 @@
                 );
             }
 
+            // --- DEVIATION & HARESINE LOGIC START ---
+            getDistance(l1, n1, l2, n2) {
+                let R = 6371000, dL = (l2-l1)*Math.PI/180, dN = (n2-n1)*Math.PI/180;
+                let a = Math.sin(dL/2)**2 + Math.cos(l1*Math.PI/180)*Math.cos(l2*Math.PI/180)*Math.sin(dN/2)**2;
+                return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            }
+
             checkSmartLogic() {
                 if(!this.currentPos) return; 
                 if(this.isSOSActive) return;
 
-                let isInside = false;
+                let isInsideZone = false;
                 let currentZone = "Transit Route";
                 
+                // 1. Check if inside a Safe Zone (Geofence)
                 for(let g of this.geofences) {
                     if(this.getDistance(this.currentPos.lat, this.currentPos.lng, g.lat, g.lng) <= g.radius) { 
-                        isInside = true; currentZone = g.name; break; 
+                        isInsideZone = true; currentZone = g.name; break; 
                     }
                 }
                 
-                if(!isInside && !this.timerInterval) {
+                // 2. Check Route Deviation
+                let isDeviating = false;
+                if (!isInsideZone && this.safeRoute.length > 0 && !this.isRecordingRoute) {
+                    let minRouteDist = Infinity;
+                    // Find distance to the closest point on the saved route
+                    this.safeRoute.forEach(pt => {
+                        let d = this.getDistance(this.currentPos.lat, this.currentPos.lng, pt.lat, pt.lng);
+                        if (d < minRouteDist) minRouteDist = d;
+                    });
+                    
+                    // Trigger if distance is greater than the allowed setting
+                    if (minRouteDist > this.settings.deviationLimit) {
+                        isDeviating = true;
+                    }
+                }
+
+                // 3. Smart Actions based on Logic
+                if (isDeviating) {
+                    this.triggerSOS(`ROUTE DEVIATION ALERT: User strayed off the safe path by more than ${this.settings.deviationLimit}m`);
+                } 
+                else if (!isInsideZone && !this.timerInterval) {
                     this.startTripTimer();
-                    this.sendMsg(`🚀 *Autonomous Alert*\nUser is outside safe zones. Transit timer started.`);
+                    this.sendMsg(`🚀 *Autonomous Alert*\nUser left safe zones. Transit timer started.`);
                     this.speakText("You are outside a safe zone. Protection timer activated.");
                 }
 
-                if(this.timerInterval && isInside) {
+                if (isInsideZone && this.timerInterval) {
                     this.killTimer();
                     if(this.routingControl) {
                         this.map.removeControl(this.routingControl);
@@ -265,38 +326,62 @@
                 
                 document.getElementById('status-mode').innerText = currentZone;
             }
+            // --- DEVIATION & HARESINE LOGIC END ---
+
+            // Route UI Methods
+            toggleRecording() {
+                this.isRecordingRoute = !this.isRecordingRoute;
+                let btn = document.getElementById('btn-record');
+                let badge = document.getElementById('rec-badge');
+                
+                if (this.isRecordingRoute) {
+                    this.safeRoute = []; // clear old route
+                    if(this.routeLine) this.map.removeLayer(this.routeLine);
+                    btn.innerHTML = "⏹️ Stop Recording Route";
+                    btn.classList.replace("btn-route", "btn-danger");
+                    badge.style.display = "inline-block";
+                    this.showStatus("Recording Path...", "warning");
+                    this.speakText("Started recording safe route.");
+                } else {
+                    btn.innerHTML = "⏺️ Start Recording Safe Route";
+                    btn.classList.replace("btn-danger", "btn-route");
+                    badge.style.display = "none";
+                    this.saveData(); // Save the new array
+                    this.showStatus("Route Saved", "success");
+                    this.speakText("Safe route saved to memory.");
+                }
+            }
+
+            drawSafeRoute() {
+                if(this.safeRoute.length === 0) return;
+                if(this.routeLine) this.map.removeLayer(this.routeLine);
+                let latlngs = this.safeRoute.map(p => [p.lat, p.lng]);
+                this.routeLine = L.polyline(latlngs, {color: 'var(--route-color)', weight: 5, dashArray: '10, 10'}).addTo(this.map);
+            }
+
+            clearRoute() {
+                this.safeRoute = [];
+                if(this.routeLine) this.map.removeLayer(this.routeLine);
+                this.saveData();
+                this.showStatus("Route Cleared", "success");
+            }
 
             findBestRoute() {
                 if(!this.currentPos || this.geofences.length === 0) {
                     this.showStatus("No Safe Zones saved or GPS unavailable.", "warning");
                     return;
                 }
-
-                let nearestZone = null;
-                let minDistance = Infinity;
-
+                let nearestZone = null; let minDistance = Infinity;
                 this.geofences.forEach(g => {
                     let d = this.getDistance(this.currentPos.lat, this.currentPos.lng, g.lat, g.lng);
-                    if(d < minDistance) {
-                        minDistance = d;
-                        nearestZone = g;
-                    }
+                    if(d < minDistance) { minDistance = d; nearestZone = g; }
                 });
-
                 if(nearestZone) {
                     if(this.routingControl) this.map.removeControl(this.routingControl);
-                    
                     this.routingControl = L.Routing.control({
-                        waypoints: [
-                            L.latLng(this.currentPos.lat, this.currentPos.lng),
-                            L.latLng(nearestZone.lat, nearestZone.lng)
-                        ],
-                        routeWhileDragging: false,
-                        addWaypoints: false,
-                        fitSelectedRoutes: true,
-                        show: false
+                        waypoints: [ L.latLng(this.currentPos.lat, this.currentPos.lng), L.latLng(nearestZone.lat, nearestZone.lng) ],
+                        routeWhileDragging: false, addWaypoints: false, fitSelectedRoutes: true, show: false
                     }).addTo(this.map);
-
                     this.speakText(`Calculating best route to ${nearestZone.name}.`);
                     this.showStatus(`Routing to ${nearestZone.name}`, "success");
                 }
@@ -305,13 +390,11 @@
             startTripTimer() {
                 this.killTimer(); 
                 let timeLeft = this.settings.travelTimerMS; 
-                
                 this.timerInterval = setInterval(() => {
                     timeLeft -= 1000;
                     let m = Math.floor(timeLeft / 60000), s = Math.floor((timeLeft % 60000) / 1000);
                     document.getElementById('timer-display').innerText = `${m}:${s < 10 ? '0'+s : s} ⏰`;
                     document.getElementById('timer-display').style.color = "var(--warning)";
-                    
                     if(timeLeft <= 0) {
                         this.killTimer(); 
                         this.triggerSOS("Travel Timer Expired (Did not reach safe zone)");
@@ -321,21 +404,14 @@
             }
 
             killTimer() {
-                if(this.timerInterval) {
-                    clearInterval(this.timerInterval);
-                    this.timerInterval = null;
-                }
+                if(this.timerInterval) { clearInterval(this.timerInterval); this.timerInterval = null; }
             }
 
             async triggerSOS(reason = "Manual Emergency") {
                 if(this.isSOSActive) return; 
                 this.isSOSActive = true;
                 this.killTimer(); 
-                
-                if(this.routingControl) {
-                    this.map.removeControl(this.routingControl);
-                    this.routingControl = null;
-                }
+                if(this.routingControl) { this.map.removeControl(this.routingControl); this.routingControl = null; }
                 
                 this.speakText("Alert! SOS Activated. Sending live location.");
                 this.showStatus("🚨 SOS BROADCAST ACTIVE", "danger");
@@ -355,23 +431,13 @@
             }
 
             async sendMsg(txt) {
-                if(!this.botToken || this.botToken === "PASTE_YOUR_BOT_TOKEN_HERE" || !this.settings.telegramChatId) {
-                    console.error("Token ya Chat ID missing hai.");
-                    return;
-                }
+                if(!this.botToken || this.botToken === "PASTE_YOUR_BOT_TOKEN_HERE" || !this.settings.telegramChatId) return;
                 try {
                     await fetch(`https://api.telegram.org/bot${this.botToken}/sendMessage`, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({chat_id: this.settings.telegramChatId, text: txt, parse_mode: 'Markdown'})
                     });
                 } catch(e) { console.error("Network fail"); }
-            }
-
-            getDistance(l1, n1, l2, n2) {
-                let R = 6371000, dL = (l2-l1)*Math.PI/180, dN = (n2-n1)*Math.PI/180;
-                let a = Math.sin(dL/2)**2 + Math.cos(l1*Math.PI/180)*Math.cos(l2*Math.PI/180)*Math.sin(dN/2)**2;
-                return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
             }
 
             updateUI() {
@@ -429,6 +495,7 @@
 
             saveSettings() {
                 this.settings.telegramChatId = document.getElementById('telegram-chatid').value;
+                this.settings.deviationLimit = parseInt(document.getElementById('deviation-limit').value) || 150;
                 let mins = parseInt(document.getElementById('timer-min').value) || 0;
                 let secs = parseInt(document.getElementById('timer-sec').value) || 0;
                 this.settings.travelTimerMS = (mins * 60000) + (secs * 1000); 
@@ -438,14 +505,17 @@
             saveData() { 
                 localStorage.setItem('rakshak_zones', JSON.stringify(this.geofences)); 
                 localStorage.setItem('rakshak_config', JSON.stringify(this.settings)); 
+                localStorage.setItem('rakshak_route', JSON.stringify(this.safeRoute)); 
             }
 
             loadData() {
-                let g = localStorage.getItem('rakshak_zones'), s = localStorage.getItem('rakshak_config');
+                let g = localStorage.getItem('rakshak_zones'), s = localStorage.getItem('rakshak_config'), r = localStorage.getItem('rakshak_route');
                 if(g) this.geofences = JSON.parse(g);
+                if(r) this.safeRoute = JSON.parse(r);
                 if(s) {
                     this.settings = JSON.parse(s);
                     document.getElementById('telegram-chatid').value = this.settings.telegramChatId || '';
+                    document.getElementById('deviation-limit').value = this.settings.deviationLimit || 150;
                     if(this.settings.travelTimerMS) {
                         document.getElementById('timer-min').value = Math.floor(this.settings.travelTimerMS / 60000);
                         document.getElementById('timer-sec').value = Math.floor((this.settings.travelTimerMS % 60000) / 1000);
@@ -464,6 +534,8 @@
         function saveGeofence() { app.saveGeofence(); }
         function saveSettings() { app.saveSettings(); }
         function triggerSOS() { app.triggerSOS("Manual Button Override"); }
+        function toggleRouteRecording() { app.toggleRecording(); }
+        function clearSafeRoute() { app.clearRoute(); }
 
         document.querySelectorAll('.nav-tab').forEach(t => {
             t.addEventListener('click', () => {
